@@ -12,3 +12,4 @@ __pycache__/
 *.log
 /.claude/settings*.json
 **/.claude/settings*.json
+.gcm/
