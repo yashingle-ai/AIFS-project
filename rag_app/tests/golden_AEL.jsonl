@@ -1,0 +1,8 @@
+{"q":"What is the consolidated total income in H1-26?","expected_pages":[2,22],"must_contain":["49,263"],"refuse":false}
+{"q":"What are the major business segments discussed in the document?","expected_pages":[2,8,10,11],"must_contain_any":["ANIL","Airports","Mining","IRM"],"refuse":false}
+{"q":"What drivers are mentioned for EBITDA changes in H1-26?","expected_pages":[2,22],"must_contain_any":["IRM","Commercial Mining","tariff","Airports"],"refuse":false}
+{"q":"What is the consolidated EBITDA for H1-26?","expected_pages":[2,22],"must_contain":["8,654"],"refuse":false}
+{"q":"How did airport passenger volume change from H1-25 to H1-26?","expected_pages":[16,32],"must_contain_any":["46.0","45.1","2%"],"refuse":false}
+{"q":"What is the CEO's email address?","expected_pages":[],"must_contain":[],"refuse":true}
+{"q":"What is the CFO's salary for FY26?","expected_pages":[],"must_contain":[],"refuse":true}
+{"q":"What is the share price target?","expected_pages":[],"must_contain":[],"refuse":true}

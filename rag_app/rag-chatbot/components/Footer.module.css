@@ -1,0 +1,30 @@
+.footer {
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.copy {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.links {
+  display: flex;
+  gap: 20px;
+}
+
+.link {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.link:hover {
+  color: var(--text-muted);
+}

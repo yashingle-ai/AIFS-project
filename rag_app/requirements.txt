@@ -1,0 +1,15 @@
+google-genai>=0.3.0
+openai>=1.40.0
+PyMuPDF>=1.24.0
+opendataloader-pdf>=2.2.1
+faiss-cpu>=1.8.0
+rank-bm25>=0.2.2
+numpy>=1.26.0
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+rich>=13.7.0
+streamlit>=1.36.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+prometheus-client>=0.20.0

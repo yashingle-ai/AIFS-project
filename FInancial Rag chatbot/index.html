@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuantX — Financial Document Intelligence RAG</title>
+<meta name="description" content="A multimodal RAG system that reads 100–1,000+ page financial documents — text, tables and charts — and answers with grounded, cited evidence. 2nd Rank, PowerMind Hackathon 2026.">
+<meta name="theme-color" content="#050706">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="QuantX — Financial Document Intelligence RAG">
+<meta property="og:description" content="Financial documents. Decoded by AI. Hybrid hierarchical retrieval, vision-based chart understanding, and grounded answers with citations.">
+<meta property="og:image" content="assets/img/win-team.jpg">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2305D97F'/><text y='72' x='50' font-size='62' font-family='Georgia,serif' text-anchor='middle' fill='%23050706'>Q</text></svg>">
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+
+<a href="#main" class="skip-link">Skip to content</a>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<header class="nav" id="nav">
+  <a class="nav__brand" href="#top" aria-label="QuantX home">
+    <span class="nav__mark" aria-hidden="true">Q</span>
+    <span class="nav__word">QuantX</span>
+  </a>
+  <nav class="nav__links" aria-label="Sections">
+    <a href="#problem">Problem</a>
+    <a href="#product">Demo</a>
+    <a href="#trace">Pipeline</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#stack">Tech</a>
+    <a href="#award">Achievement</a>
+    <a href="#team">Team</a>
+  </nav>
+  <div class="nav__actions">
+    <a class="btn btn--ghost btn--sm" href="https://github.com/yashingle-ai/-PS2-QuantX-Financial-Document-Intelligence-RAG" target="_blank" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span></button>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero" id="top">
+  <div class="hero__grid" aria-hidden="true"></div>
+  <div class="hero__inner">
+
+    <div class="hero__copy">
+      <p class="eyebrow reveal">
+        <span class="dot" aria-hidden="true"></span>
+        POWERMIND HACKATHON 2026 · 2ND RANK · ₹50,000
+      </p>
+
+      <h1 class="hero__title reveal" data-delay="1">
+        Financial<br>
+        documents.<br>
+        <em>Decoded</em> by AI.
+      </h1>
+
+      <p class="hero__lede reveal" data-delay="2">
+        QuantX reads 100–1,000+ page earnings decks, filings and annual reports —
+        including the tables and charts inside them — and answers questions with
+        evidence you can trace back to the page.
+      </p>
+
+      <div class="hero__cta reveal" data-delay="3">
+        <a class="btn btn--primary" href="#product">Explore the system</a>
+        <a class="btn btn--ghost" href="https://github.com/yashingle-ai/-PS2-QuantX-Financial-Document-Intelligence-RAG" target="_blank" rel="noopener">View source <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <ul class="hero__tags reveal" data-delay="4">
+        <li>MULTIMODAL RAG</li>
+        <li>HYBRID SEARCH</li>
+        <li>VISION AI</li>
+        <li>GROUNDED ANSWERS</li>
+      </ul>
+    </div>
+
+    <!-- Live query trace -->
+    <div class="hero__visual reveal" data-delay="2">
+      <div class="trace" id="heroTrace" role="img" aria-label="Animated illustration of the QuantX query pipeline: a question is rewritten for the Indian fiscal calendar, routed by intent, retrieved from three index tiers, fused, reranked, generated and citation-checked.">
+        <div class="trace__bar">
+          <span class="trace__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="trace__title">query trace</span>
+          <span class="trace__live"><i aria-hidden="true"></i>live</span>
+        </div>
+        <div class="trace__body">
+          <div class="trace__q">
+            <span class="trace__label">QUERY</span>
+            <p>“What was the EBITDA growth in <b>Q2 FY26</b>?”</p>
+          </div>
+
+          <ol class="trace__steps">
+            <li class="trace__step" data-step="0">
+              <span class="trace__k">REWRITE</span>
+              <span class="trace__v">Q2 FY26 <i aria-hidden="true">→</i> quarter ended 30-09-2025</span>
+            </li>
+            <li class="trace__step" data-step="1">
+              <span class="trace__k">INTENT</span>
+              <span class="trace__v"><b class="tag-green">FACTUAL</b> · chunk-level strategy</span>
+            </li>
+            <li class="trace__step" data-step="2">
+              <span class="trace__k">RETRIEVE</span>
+              <span class="trace__v">chunk <i aria-hidden="true">·</i> page <i aria-hidden="true">·</i> document</span>
+            </li>
+            <li class="trace__step" data-step="3">
+              <span class="trace__k">FUSE</span>
+              <span class="trace__v">FAISS <i aria-hidden="true">∪</i> BM25 <i aria-hidden="true">→</i> RRF</span>
+            </li>
+            <li class="trace__step" data-step="4">
+              <span class="trace__k">RERANK</span>
+              <span class="trace__v">NVIDIA cross-encoder</span>
+            </li>
+            <li class="trace__step" data-step="5">
+              <span class="trace__k">GENERATE</span>
+              <span class="trace__v">Llama 3.3 70B <i aria-hidden="true">/</i> Gemini 2.5</span>
+            </li>
+            <li class="trace__step" data-step="6">
+              <span class="trace__k">VERIFY</span>
+              <span class="trace__v">citation engine <i aria-hidden="true">·</i> refusal floor</span>
+            </li>
+          </ol>
+
+          <div class="trace__answer" data-step="7">
+            <span class="trace__label">GROUNDED ANSWER</span>
+            <p>Answer assembled from retrieved evidence, every claim carrying a citation:</p>
+            <div class="chips">
+              <code>[doc:p12:c3]</code><code>[doc:p14:c1]</code><code>[doc:p2:c9]</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+      <span>RAG</span><span>·</span><span>FAISS</span><span>·</span><span>BM25</span><span>·</span><span>RRF</span><span>·</span><span>VISION</span><span>·</span><span>RERANK</span><span>·</span><span>GROUND</span><span>·</span><span>CITE</span><span>·</span><span>RETRIEVE</span><span>·</span><span>ANALYZE</span><span>·</span>
+      <span>RAG</span><span>·</span><span>FAISS</span><span>·</span><span>BM25</span><span>·</span><span>RRF</span><span>·</span><span>VISION</span><span>·</span><span>RERANK</span><span>·</span><span>GROUND</span><span>·</span><span>CITE</span><span>·</span><span>RETRIEVE</span><span>·</span><span>ANALYZE</span><span>·</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ PROBLEM ═══════════════ -->
+<section class="section" id="problem">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">01 — THE PROBLEM</p>
+      <h2 class="display reveal" data-delay="1">Financial PDFs weren't<br>designed for AI.</h2>
+      <p class="sec-lede reveal" data-delay="2">
+        Six failure modes break a standard vector-database chatbot on a real annual report.
+        QuantX was engineered around each one.
+      </p>
+    </header>
+
+    <ol class="problems">
+      <li class="problem reveal">
+        <span class="problem__n">01</span>
+        <h3>Tables</h3>
+        <p>Flat chunking severs the relationship between a row label, its column header and the number in the cell. The metric survives; its meaning doesn't.</p>
+      </li>
+      <li class="problem reveal">
+        <span class="problem__n">02</span>
+        <h3>Charts</h3>
+        <p>A text-only pipeline is blind to bar charts, waterfalls and trend lines — often exactly where the quarter's story is told.</p>
+      </li>
+      <li class="problem reveal">
+        <span class="problem__n">03</span>
+        <h3>Context</h3>
+        <p>Split a 300-page report into isolated fragments and “summarise this document” returns fragments back, never the narrative.</p>
+      </li>
+      <li class="problem reveal">
+        <span class="problem__n">04</span>
+        <h3>Retrieval</h3>
+        <p>“Q2 FY26 revenue” needs an exact lexical hit <em>and</em> semantic understanding of “second quarter”. One index cannot do both.</p>
+      </li>
+      <li class="problem reveal">
+        <span class="problem__n">05</span>
+        <h3>Hallucination</h3>
+        <p>In finance a single invented figure poisons the whole answer. Plausible is worthless; only traceable counts.</p>
+      </li>
+      <li class="problem reveal">
+        <span class="problem__n">06</span>
+        <h3>Fiscal language</h3>
+        <p>Users ask for <b>Q2 FY26</b>. The PDF says <b>quarter ended 30-09-2025</b>. Identical meaning, zero lexical overlap.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ═══════════════ PRODUCT ═══════════════ -->
+<section class="section section--alt" id="product">
+  <div class="wrap">
+    <header class="sec-head sec-head--split">
+      <div>
+        <p class="eyebrow reveal">02 — THE PRODUCT</p>
+        <h2 class="display reveal" data-delay="1">Ask the document.<br>Not Ctrl+F.</h2>
+      </div>
+      <p class="sec-lede reveal" data-delay="2">
+        Upload a PDF, wait for indexing, then ask in plain English. Every claim in the answer
+        carries a citation chip — click it and the exact retrieved chunk appears.
+      </p>
+    </header>
+
+    <div class="shots reveal" data-delay="1">
+      <div class="shots__tabs" role="tablist" aria-label="Product screenshots">
+        <button role="tab" aria-selected="true"  aria-controls="shot-0" id="tab-0" class="is-active">Chat &amp; citations</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-1" id="tab-1">Grounded answer</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-2" id="tab-2">Workspace</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-3" id="tab-3">Landing</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-4" id="tab-4">Problem</button>
+        <button role="tab" aria-selected="false" aria-controls="shot-5" id="tab-5">Solution</button>
+      </div>
+
+      <div class="frame">
+        <div class="frame__bar">
+          <span class="frame__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="frame__url" id="frameUrl">localhost:8000 — DocChat</span>
+          <span class="frame__hint">click to enlarge</span>
+        </div>
+        <div class="frame__stage">
+          <button class="shot is-active" role="tabpanel" id="shot-0" aria-labelledby="tab-0" data-full="assets/img/app-docchat.jpg">
+            <img src="assets/img/app-docchat.jpg" alt="The DocChat interface: a 33-page PDF indexed into 192 chunks and 30 tables, with an answer listing expense components, each line tagged with a green citation chip." width="1600" height="758" loading="lazy" decoding="async">
+          </button>
+          <button class="shot" role="tabpanel" id="shot-1" aria-labelledby="tab-1" hidden data-full="assets/img/app-answer.jpg">
+            <img src="assets/img/app-answer.jpg" alt="Close-up of a grounded answer summarising unaudited financial results, with a strong support badge and a Supporting Evidence list of citation chips." width="1154" height="891" loading="lazy" decoding="async">
+          </button>
+          <button class="shot" role="tabpanel" id="shot-2" aria-labelledby="tab-2" hidden data-full="assets/img/app-workspace.jpg">
+            <img src="assets/img/app-workspace.jpg" alt="The RAG chatbot workspace: document intake panel, conversation panel and a retrieved-chunk inspector, with the active NVIDIA models listed as chips." width="1600" height="759" loading="lazy" decoding="async">
+          </button>
+          <button class="shot" role="tabpanel" id="shot-3" aria-labelledby="tab-3" hidden data-full="assets/img/app-landing.jpg">
+            <img src="assets/img/app-landing.jpg" alt="The product landing page with the headline RAG Chatbot Built for Your Data." width="1600" height="757" loading="lazy" decoding="async">
+          </button>
+          <button class="shot" role="tabpanel" id="shot-4" aria-labelledby="tab-4" hidden data-full="assets/img/app-problem.jpg">
+            <img src="assets/img/app-problem.jpg" alt="In-product problem page: Documents Weren't Built for AI, listing scrambled reading order, lost table structure and missing source coordinates." width="1600" height="761" loading="lazy" decoding="async">
+          </button>
+          <button class="shot" role="tabpanel" id="shot-5" aria-labelledby="tab-5" hidden data-full="assets/img/app-solution.jpg">
+            <img src="assets/img/app-solution.jpg" alt="In-product solution page: Built for RAG, Not Just Reading, covering smart reading order, bounding boxes, hybrid OCR and table extraction." width="1600" height="757" loading="lazy" decoding="async">
+          </button>
+        </div>
+      </div>
+
+      <ul class="shots__meta">
+        <li><b>33</b> pages indexed</li>
+        <li><b>192</b> chunks</li>
+        <li><b>30</b> tables preserved</li>
+        <li><b>strong support</b> grounding badge</li>
+      </ul>
+      <p class="micro">Figures read directly from the running application in the screenshot above.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ QUERY TRACE ═══════════════ -->
+<section class="section" id="trace">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">03 — THE JOURNEY OF ONE QUESTION</p>
+      <h2 class="display reveal" data-delay="1">Eight stages between<br>a question and an answer.</h2>
+      <p class="sec-lede reveal" data-delay="2">
+        This is what separates QuantX from an embedding lookup with a chat box on top.
+      </p>
+    </header>
+
+    <div class="journey" id="journey">
+      <div class="journey__rail" aria-hidden="true"><span class="journey__fill" id="journeyFill"></span></div>
+      <ol class="journey__list">
+        <li class="jstep reveal"><span class="jstep__i">01</span><div><h3>Query</h3><p>“What was the EBITDA growth in Q2 FY26?” arrives with conversation history attached.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">02</span><div><h3>Decompose &amp; rewrite</h3><p>Pronouns and follow-up references are resolved into a standalone retrieval query.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">03</span><div><h3>Fiscal expansion</h3><p><code>Q2 FY26</code> → <code>quarter ended 30-09-2025</code>. <code>H1 FY26</code> and bare <code>FY26</code> expand the same way.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">04</span><div><h3>Intent routing</h3><p>Classified <code>FACTUAL</code>, <code>SUMMARY</code>, <code>COMPARISON</code> or <code>PRESUMMARY</code> — each routes to a different retrieval strategy and top-k.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">05</span><div><h3>Hierarchical retrieval</h3><p>Chunk, page and document indices are searched independently, then merged and de-duplicated by citation.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">06</span><div><h3>Hybrid fusion</h3><p>Dense FAISS and sparse BM25 rankings combine through Reciprocal Rank Fusion: <code>score = Σ 1/(k + rank)</code>.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">07</span><div><h3>Cross-encoder rerank</h3><p>30 candidates are re-scored by a hosted NVIDIA reranker and trimmed to the top evidence.</p></div></li>
+        <li class="jstep reveal"><span class="jstep__i">08</span><div><h3>Generate &amp; verify</h3><p>The LLM answers under strict grounding rules; malformed citations are repaired against the chunks actually retrieved.</p></div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ ARCHITECTURE ═══════════════ -->
+<section class="section section--alt" id="architecture">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">04 — ARCHITECTURE</p>
+      <h2 class="display reveal" data-delay="1">Built beyond basic RAG.</h2>
+      <p class="sec-lede reveal" data-delay="2">
+        Two ingestion parsers, a vision pass, three index tiers, hybrid fusion and a
+        verification stage — designed on paper before a line of it existed.
+      </p>
+    </header>
+
+    <!-- Napkin → System -->
+    <div class="origin reveal">
+      <figure class="origin__card origin__card--sketch">
+        <div class="origin__tag">DAY 1 — THE NOTEBOOK</div>
+        <button class="zoomable" data-full="assets/img/arch-sketch.png" aria-label="Enlarge the original hand-drawn architecture sketch">
+          <img src="assets/img/arch-sketch.png" alt="The original hand-drawn architecture on ruled notebook paper, showing user, document, OpenDataLoader, text/image/table branches into FAISS, and the query path through decomposition, rewriting, summarisation, retrieval, reranking and output." width="933" height="1280" loading="lazy" decoding="async">
+        </button>
+        <figcaption>The system as first drawn — OpenDataLoader branching into text, image and table parsers, and the query path already routing through summarisation, retrieval and reranking. <b>Click to see the full page.</b></figcaption>
+      </figure>
+
+      <div class="origin__arrow" aria-hidden="true">
+        <span class="origin__arrowline"></span>
+        <span class="origin__arrowtxt">SHIPPED</span>
+      </div>
+
+      <figure class="origin__card">
+        <div class="origin__tag origin__tag--green">THE SYSTEM</div>
+        <button class="zoomable" data-full="assets/img/arch-highlevel.jpg" aria-label="Enlarge the high level architecture diagram">
+          <img src="assets/img/arch-highlevel.jpg" alt="High Level Architecture diagram with two pipelines: an ingestion pipeline taking documents through loaders and parsers into a FAISS vector store, and a query pipeline running decomposition, rewriting, a summariser decision branch, embedding, retrieval, reranking and a Meta LLM into the final output." width="1536" height="1024" loading="lazy" decoding="async">
+        </button>
+        <figcaption>The delivered architecture: an ingestion pipeline and a query pipeline meeting at a shared vector store, with a summariser branch for long-context questions.</figcaption>
+      </figure>
+    </div>
+
+    <!-- Pipeline strip -->
+    <div class="pipe reveal">
+      <div class="pipe__row">
+        <span class="pipe__node">PDF</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">OpenDataLoader</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">Vision caption</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">Chunking</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">Enrichment</span>
+      </div>
+      <div class="pipe__tiers">
+        <span class="pipe__tier">CHUNK INDEX</span>
+        <span class="pipe__tier">PAGE INDEX</span>
+        <span class="pipe__tier">DOCUMENT INDEX</span>
+      </div>
+      <div class="pipe__row">
+        <span class="pipe__node">FAISS + BM25</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">RRF</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">Rerank</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">Qwen 3-4B</span><i aria-hidden="true">→</i>
+        <span class="pipe__node">LLM</span><i aria-hidden="true">→</i>
+        <span class="pipe__node pipe__node--out">Citations</span>
+      </div>
+      <p class="micro">PyMuPDF runs as the fallback parser whenever OpenDataLoader is unavailable — indexing never hard-fails.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ THREE TIERS ═══════════════ -->
+<section class="section" id="tiers">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">05 — HIERARCHICAL RETRIEVAL</p>
+      <h2 class="display reveal" data-delay="1">Retrieval at every<br>level of context.</h2>
+      <p class="sec-lede reveal" data-delay="2">
+        One index answers one kind of question. QuantX keeps three, each with its own
+        FAISS and BM25 pair, and picks between them by intent.
+      </p>
+    </header>
+
+    <div class="tiers">
+      <article class="tier reveal">
+        <div class="tier__head"><span class="tier__n">01</span><h3>Chunk index</h3></div>
+        <p>Precise facts, single metrics and individual table cells. Where <em>“what was total income in H1 FY26?”</em> gets answered.</p>
+        <div class="tier__bar" style="--w:32%"></div>
+        <span class="tier__scale">narrow · exact</span>
+      </article>
+      <article class="tier reveal" data-delay="1">
+        <div class="tier__head"><span class="tier__n">02</span><h3>Page index</h3></div>
+        <p>Page-level summaries that hold a metric together with the sentences around it — the context a lone cell loses.</p>
+        <div class="tier__bar" style="--w:64%"></div>
+        <span class="tier__scale">local · contextual</span>
+      </article>
+      <article class="tier reveal" data-delay="2">
+        <div class="tier__head"><span class="tier__n">03</span><h3>Document index</h3></div>
+        <p>The global narrative: highlights, segment analysis, trends and risks. Where <em>“summarise this report”</em> is actually answerable.</p>
+        <div class="tier__bar" style="--w:100%"></div>
+        <span class="tier__scale">global · narrative</span>
+      </article>
+    </div>
+
+    <div class="fusion reveal">
+      <div class="fusion__side">
+        <span class="fusion__lab">DENSE</span>
+        <b>FAISS</b>
+        <p>IndexFlatIP over L2-normalised vectors — cosine similarity, semantic recall.</p>
+      </div>
+      <div class="fusion__op" aria-hidden="true">
+        <span class="fusion__plus">+</span>
+        <span class="fusion__rrf">RRF</span>
+        <span class="fusion__eq">Σ 1/(k + rank)</span>
+      </div>
+      <div class="fusion__side">
+        <span class="fusion__lab">SPARSE</span>
+        <b>BM25</b>
+        <p>Okapi ranking with finance-aware tokenisation — exact ticker, date and metric hits.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ MULTIMODAL ═══════════════ -->
+<section class="section section--alt" id="multimodal">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">06 — MULTIMODAL INTELLIGENCE</p>
+      <h2 class="display reveal" data-delay="1">Charts become<br>searchable knowledge.</h2>
+      <p class="sec-lede reveal" data-delay="2">
+        A vision model reads every meaningful image at index time and writes it back as
+        structured text. The cost is paid once, during indexing — never at query time.
+      </p>
+    </header>
+
+    <div class="modal-split reveal">
+      <div class="modal-split__col">
+        <span class="modal-split__tag">INPUT · PIXELS</span>
+        <div class="fauxchart" aria-hidden="true">
+          <div class="fauxchart__bars">
+            <span style="--h:46%"></span><span style="--h:62%"></span><span style="--h:55%"></span><span style="--h:78%"></span><span style="--h:71%"></span><span style="--h:94%"></span>
+          </div>
+          <div class="fauxchart__axis"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <p class="modal-split__note">A bar chart embedded in an earnings deck. To a text-only pipeline this page is empty.</p>
+      </div>
+
+      <div class="modal-split__mid" aria-hidden="true">
+        <span class="modal-split__arrow">→</span>
+        <span class="modal-split__model">LLAMA 3.2 VISION</span>
+      </div>
+
+      <div class="modal-split__col">
+        <span class="modal-split__tag modal-split__tag--green">OUTPUT · STRUCTURED TEXT</span>
+        <div class="codeblock">
+<pre><code><span class="c-com"># chart → markdown, written into the index</span>
+| Period   | Metric | Value |
+|----------|--------|-------|
+| Q1 FY26  | Revenue| ...   |
+| Q2 FY26  | Revenue| ...   |
+
+<span class="c-com">Axis labels, legend entries, series names and
+the trend description are captured as text —
+so the chart is now reachable by both FAISS
+and BM25 like any other chunk.</span></code></pre>
+        </div>
+        <p class="modal-split__note">Failures degrade silently: an image that can't be captioned is skipped, never breaking the index run.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ GROUNDING ═══════════════ -->
+<section class="section" id="grounding">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">07 — HALLUCINATION RESISTANCE</p>
+      <h2 class="display reveal" data-delay="1">If the evidence isn't there,<br>QuantX doesn't invent it.</h2>
+    </header>
+
+    <div class="versus">
+      <article class="vs vs--bad reveal">
+        <h3>Standard RAG</h3>
+        <ol>
+          <li>Question</li>
+          <li>Single-index retrieval</li>
+          <li>Weak or off-topic context</li>
+          <li>Model answers anyway</li>
+          <li class="vs--flag">A confident, unsupported number</li>
+        </ol>
+      </article>
+
+      <article class="vs vs--good reveal" data-delay="1">
+        <h3>QuantX</h3>
+        <ol>
+          <li>Question</li>
+          <li>Hierarchical hybrid retrieval</li>
+          <li>Cross-encoder reranking</li>
+          <li>Confidence floor evaluated</li>
+          <li>Citations validated and repaired</li>
+          <li class="vs--ok">Grounded answer — or an explicit refusal</li>
+        </ol>
+      </article>
+    </div>
+
+    <div class="floor reveal">
+      <span class="floor__tag">REFUSAL FLOOR</span>
+      <p>
+        When the best dense score falls below <b>0.30</b> <em>and</em> the best sparse score
+        below <b>0.60</b>, the system refuses instead of generating. Answers also carry a
+        grounding badge — the <b class="tag-green">strong support</b> chip visible in the
+        screenshots above — so a weakly-supported answer announces itself.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ ENGINEERING ═══════════════ -->
+<section class="section section--alt" id="engineering">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">08 — ENGINEERING DEPTH</p>
+      <h2 class="display reveal" data-delay="1">Built like a system.<br>Not a demo.</h2>
+    </header>
+
+    <div class="bento">
+      <article class="bcard bcard--wide reveal">
+        <span class="bcard__n" data-count="12">0</span><span class="bcard__suffix">+</span>
+        <h3>REST endpoints</h3>
+        <p>Upload, status polling, PDF and image serving, suggestions, summaries, single- and multi-document chat, feedback, metrics.</p>
+      </article>
+      <article class="bcard reveal">
+        <span class="bcard__n" data-count="3">0</span>
+        <h3>Index tiers</h3>
+        <p>Chunk, page and document — each with its own dense and sparse pair.</p>
+      </article>
+      <article class="bcard reveal">
+        <span class="bcard__n" data-count="6">0</span>
+        <h3>Security layers</h3>
+        <p>CORS, CSP headers, bearer auth, per-IP token-bucket limits, path-traversal guards, input validation.</p>
+      </article>
+      <article class="bcard reveal">
+        <span class="bcard__n" data-count="8">0</span>
+        <h3>Prometheus metrics</h3>
+        <p>Request counts and latency histograms, chat tokens, indexing runs, retrieval scores, feedback.</p>
+      </article>
+      <article class="bcard reveal">
+        <span class="bcard__n" data-count="17">0</span>
+        <h3>Python modules</h3>
+        <p>Ingestion, chunking, enrichment, vision, summarisation, retrieval, reranking, intelligence, security, observability.</p>
+      </article>
+      <article class="bcard bcard--accent reveal">
+        <h3>SSE streaming</h3>
+        <p>Answers stream token-by-token over server-sent events with a <code>meta → token → done</code> frame protocol.</p>
+      </article>
+      <article class="bcard reveal">
+        <h3>Multi-LLM</h3>
+        <p>NVIDIA NIM and Google Gemini are hot-swappable for chat, embeddings and vision through environment config.</p>
+      </article>
+      <article class="bcard bcard--wide reveal">
+        <h3>Evaluation harness</h3>
+        <p>A golden Q&amp;A set scored on <b>recall@k</b>, <b>page precision</b>, <b>refusal accuracy</b> and <b>faithfulness</b>, plus five must-pass acceptance scenarios including a negative control that must be refused.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ TECH STACK ═══════════════ -->
+<section class="section" id="stack">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">09 — STACK</p>
+      <h2 class="display reveal" data-delay="1">Every tool, at its<br>station in the pipeline.</h2>
+    </header>
+
+    <div class="stack">
+      <div class="stack__row reveal"><span class="stack__stage">PARSE</span><div class="stack__items"><span>OpenDataLoader</span><span>PyMuPDF</span><span>Camelot</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">UNDERSTAND</span><div class="stack__items"><span>Llama 3.2 11B Vision</span><span>Gemini 2.5 Flash</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">EMBED</span><div class="stack__items"><span>NVIDIA NV-EmbedQA-E5-v5</span><span>Gemini Embedding 001</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">INDEX</span><div class="stack__items"><span>FAISS IndexFlatIP</span><span>BM25 Okapi</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">RANK</span><div class="stack__items"><span>Reciprocal Rank Fusion</span><span>NVIDIA RerankQA 1B v2</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">SUMMARISE</span><div class="stack__items"><span>Qwen3-4B-Instruct</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">GENERATE</span><div class="stack__items"><span>Llama 3.3 70B Instruct</span><span>Gemini 2.5 Flash</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">SERVE</span><div class="stack__items"><span>FastAPI</span><span>Uvicorn</span><span>React SPA</span><span>Streamlit</span></div></div>
+      <div class="stack__row reveal"><span class="stack__stage">OBSERVE</span><div class="stack__items"><span>Prometheus</span><span>Structured JSON logs</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ AWARD ═══════════════ -->
+<section class="section section--award" id="award">
+  <div class="wrap">
+    <div class="award__type reveal">
+      <span class="award__rank">02</span>
+      <div class="award__meta">
+        <p class="eyebrow">POWERMIND HACKATHON 2026</p>
+        <h2 class="display">Second rank.<br>₹50,000.<br>Four builders.</h2>
+        <p class="award__sub">
+          Problem Statement 2 — <em>Document-Grounded Conversation AI Using RAG</em>.
+          Organised by the Career Development Cell, SVNIT Surat, powered by Adani.
+        </p>
+        <p class="award__quote">Built under hackathon pressure. Engineered past the prototype.</p>
+      </div>
+    </div>
+
+    <div class="award__gallery">
+      <figure class="award__shot award__shot--lead reveal">
+        <button class="zoomable" data-full="assets/img/win-team.jpg" aria-label="Enlarge the team photograph with the prize cheque">
+          <img src="assets/img/win-team.jpg" alt="The four-member QuantX team on stage holding an oversized PowerMind Hackathon 2026 cheque reading 2nd Prize Winner, PS 2, Document-Grounded Conversation AI Using RAG, ₹50,000." width="1280" height="720" loading="lazy" decoding="async">
+        </button>
+        <figcaption>Team QuantX — 2nd Prize, PS 2 · ₹50,000</figcaption>
+      </figure>
+      <figure class="award__shot reveal" data-delay="1">
+        <button class="zoomable" data-full="assets/img/win-stage.jpg" aria-label="Enlarge the presentation photograph">
+          <img src="assets/img/win-stage.jpg" alt="A team member at the podium beside the PowerMind Hackathon banner during the presentation." width="719" height="1280" loading="lazy" decoding="async">
+        </button>
+        <figcaption>Presenting at SVNIT Surat</figcaption>
+      </figure>
+      <figure class="award__shot reveal" data-delay="2">
+        <button class="zoomable" data-full="assets/img/win-group.jpg" aria-label="Enlarge the ceremony group photograph">
+          <img src="assets/img/win-group.jpg" alt="Group photograph at the award ceremony with the team, organisers and faculty on stage." width="1280" height="853" loading="lazy" decoding="async">
+        </button>
+        <figcaption>Award ceremony</figcaption>
+      </figure>
+    </div>
+
+    <div class="deck reveal">
+      <div>
+        <h3>The pitch deck</h3>
+        <p>The full presentation taken to the judges — problem framing, architecture, innovation and results.</p>
+      </div>
+      <a class="btn btn--ghost" href="https://github.com/yashingle-ai/-PS2-QuantX-Financial-Document-Intelligence-RAG/raw/main/QuantX_Precision_Financial_AI.pptx">Download presentation <span aria-hidden="true">↓</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ TEAM ═══════════════ -->
+<section class="section" id="team">
+  <div class="wrap">
+    <header class="sec-head">
+      <p class="eyebrow reveal">10 — TEAM</p>
+      <h2 class="display reveal" data-delay="1">Built by four.</h2>
+    </header>
+
+    <div class="team">
+      <article class="member reveal">
+        <h3>Yash Ingle</h3>
+        <p class="member__role">Backend &amp; RAG Architecture</p>
+        <p>Built the complete backend pipeline — RAG architecture, ingestion, hybrid retrieval, reranking flow, query processing and overall system integration.</p>
+      </article>
+      <article class="member reveal" data-delay="1">
+        <h3>Himal Rana</h3>
+        <p class="member__role">Frontend &amp; Integration</p>
+        <p>Developed the frontend and user interaction layer, handled frontend–backend integration, and resolved debugging and functionality issues.</p>
+      </article>
+      <article class="member reveal" data-delay="2">
+        <h3>Tarun Bhutra</h3>
+        <p class="member__role">Testing &amp; Innovation</p>
+        <p>Worked on testing, validation, innovation ideas and improving the overall workflow.</p>
+      </article>
+      <article class="member reveal" data-delay="3">
+        <h3>Ankit Yadav</h3>
+        <p class="member__role">Testing &amp; Innovation</p>
+        <p>Worked on testing, validation, innovation ideas and improving the overall workflow.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CTA ═══════════════ -->
+<section class="cta">
+  <div class="wrap">
+    <h2 class="display cta__title reveal">Financial documents<br>contain answers.<br><em>QuantX finds the evidence.</em></h2>
+    <p class="cta__sub reveal" data-delay="1">Multimodal understanding. Hybrid retrieval. Grounded intelligence.</p>
+    <div class="cta__btns reveal" data-delay="2">
+      <a class="btn btn--primary" href="https://github.com/yashingle-ai/-PS2-QuantX-Financial-Document-Intelligence-RAG" target="_blank" rel="noopener">View source on GitHub <span aria-hidden="true">↗</span></a>
+      <a class="btn btn--ghost" href="#architecture">Explore architecture <span aria-hidden="true">↑</span></a>
+    </div>
+    <p class="cta__badge reveal" data-delay="3">🏆 PowerMind Hackathon 2026 · 2nd Rank · ₹50,000</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <div>
+      <p class="footer__brand">QuantX</p>
+      <p class="footer__desc">Financial Document Intelligence RAG · Built for the PowerMind Hackathon 2026.</p>
+    </div>
+    <nav class="footer__links" aria-label="Footer">
+      <a href="https://github.com/yashingle-ai/-PS2-QuantX-Financial-Document-Intelligence-RAG" target="_blank" rel="noopener">GitHub</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#product">Demo</a>
+      <a href="#team">Team</a>
+    </nav>
+  </div>
+</footer>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged image" hidden>
+  <button class="lightbox__close" id="lightboxClose" aria-label="Close">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<script src="assets/js/main.js" defer></script>
+</body>
+</html>

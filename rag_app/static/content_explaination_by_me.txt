@@ -1,0 +1,341 @@
+================================================================================
+QuantX - WHAT PROBLEM ARE WE SOLVING, AND HOW IS THIS DIFFERENT
+================================================================================
+My own notes for explaining this project.
+
+
+================================================================================
+PART 1 - THE PROBLEM
+================================================================================
+
+
+
+
+The one-line version
+--------------------
+A financial analyst has a 300-page annual report and a specific question.
+Ctrl+F needs the exact word. A normal AI chatbot gives a confident answer you
+cannot verify. In finance, an answer you cannot verify is worthless - and one
+invented number can make an entire report useless.
+
+So the real problem is not "search a PDF".
+It is: ANSWER FROM THE DOCUMENT, AND PROVE IT.
+
+
+Why financial PDFs are genuinely hard
+-------------------------------------
+
+PROBLEM 1 - A PDF has no structure
+  A PDF is not a document. It is a set of glyphs with x/y coordinates on a
+  page. There is no "this is a table", no "this is a heading", no reading
+  order. Two-column layouts get read straight across, mixing unrelated
+  sentences into one line.
+
+PROBLEM 2 - Tables break when you chunk them
+  This is the biggest one.
+  A standard chunker cuts text every ~500 characters. Cut through a financial
+  table and the row gets separated from its header. What survives is:
+
+      | 469.80 | 349.63 | 206.44 |
+
+  The numbers are there. The meaning is gone. Is 469.80 finance cost or
+  revenue? Which quarter? The model has to guess - and it will guess
+  confidently.
+
+PROBLEM 3 - Charts are invisible
+  Earnings decks tell the story in bar charts and waterfalls. A text-only
+  pipeline extracts nothing from those pages. Ask about a trend that is only
+  shown visually and retrieval returns an empty page.
+
+PROBLEM 4 - Long documents lose the plot
+  Break a 300-page report into 3,000 fragments and ask "summarise this
+  report". You get fragments back. The narrative - segment performance,
+  trends, risks - only exists at the whole-document level, and top-k over
+  small chunks can never reconstruct it.
+
+PROBLEM 5 - Financial questions need TWO kinds of search at once
+  "Q2 FY26 revenue" needs an EXACT match on a period string.
+  "How did the airport segment perform" needs MEANING-based matching.
+
+  Vector search is good at meaning and bad at exact tokens - it smears all
+  the quarters together because they look alike. Keyword search is the
+  opposite. One index cannot do both, but one sentence needs both.
+
+PROBLEM 6 - The words don't match (my favourite example)
+  The user asks:        "Q2 FY26"
+  The document says:    "quarter ended 30-09-2025"
+
+  Same meaning. ZERO words in common. Keyword search finds nothing, and the
+  embedding does not reliably bridge it either. This is an Indian fiscal
+  calendar problem that no general RAG tutorial solves.
+
+PROBLEM 7 - Hallucination is fatal here, not annoying
+  If a chatbot invents a movie recommendation, nobody is harmed. If it
+  invents an EBITDA figure, someone makes a decision on a number that does
+  not exist. A wrong answer is worse than no answer.
+
+
+================================================================================
+PART 2 - HOW MY CHATBOT IS DIFFERENT
+================================================================================
+
+Short answer to give in an interview:
+"Most RAG chatbots are an embedding lookup with a chat box. Mine is built
+around the assumption that a wrong number is worse than no answer."
+
+Below: what a NORMAL chatbot does vs what MINE does.
+
+
+--------------------------------------------------------------------------------
+1. CITATION FOR EVERY FACT, AND THE CITATIONS ARE CHECKED
+--------------------------------------------------------------------------------
+NORMAL: Gives an answer. Maybe mentions a page number the model made up.
+
+MINE:   Every claim carries a citation like [doc:p18:c110]. After the model
+        answers, the citations are VALIDATED against the chunks that were
+        actually retrieved, and repaired or dropped if they don't match.
+
+WHY IT MATTERS: Models emit citations that look correct but point nowhere.
+Unvalidated citations are decoration. Validated ones are evidence.
+Click a citation in the UI and you see the exact retrieved chunk.
+
+Code: intelligence.py -> _repair_citations()  
+
+
+--------------------------------------------------------------------------------
+2. IT REFUSES - AND IT REFUSES BEFORE CALLING THE MODEL
+--------------------------------------------------------------------------------
+NORMAL: Always answers. If retrieval was weak, it fills the gap from its
+        training data and sounds just as confident.
+
+MINE:   Before generating, it checks the retrieval scores. If the best dense
+        score AND the best keyword score are both below their thresholds, it
+        returns "Not found in the document" and never calls the LLM at all.
+
+WHY IT MATTERS: This is the key design point. Telling a model "don't
+hallucinate" is a request. Not calling the model REMOVES THE OPPORTUNITY.
+You cannot hallucinate a call that never happened.
+
+There are three layers, not one:
+   a) the prompt forbids outside knowledge
+   b) the score floor refuses before generation   <- the strong one
+   c) citations are validated after generation
+
+Code: intelligence.py -> _insufficient()
+
+
+--------------------------------------------------------------------------------
+3. HYBRID SEARCH, NOT JUST VECTOR SEARCH
+--------------------------------------------------------------------------------
+NORMAL: One vector database. Semantic search only.
+
+MINE:   Two indexes running in parallel -
+          FAISS  (dense / meaning)
+          BM25   (sparse / exact keywords)
+        then the two rankings are merged with Reciprocal Rank Fusion.
+
+WHY RRF AND NOT JUST ADDING THE SCORES: cosine similarity and BM25 scores
+are on completely different scales - adding them is meaningless. RRF ignores
+the score values and merges on RANK position instead, so the two indexes
+never have to be calibrated against each other.
+
+This is what solves PROBLEM 5.
+
+Code: retriever.py -> search()
+
+
+--------------------------------------------------------------------------------
+4. THREE LEVELS OF INDEX, NOT ONE
+--------------------------------------------------------------------------------
+NORMAL: One index of small chunks. Good at facts, useless at summaries.
+
+MINE:   Three indexes per document, each with its own FAISS + BM25 pair:
+
+          CHUNK level     -> exact facts, table cells    "total income in H1?"
+          PAGE level      -> a metric plus its context
+          DOCUMENT level  -> narrative, trends, risks    "summarise this report"
+
+        A router picks which level to search based on the question type.
+
+WHY IT MATTERS: This solves PROBLEM 4. Instead of compromising on one chunk
+size that is mediocre at everything, each question type gets an index built
+at the right granularity.
+
+BONUS: the page and document summaries are built WITHOUT an LLM (extractive
+sentence ranking), so the extra two tiers are basically free and fully
+reproducible.
+
+Code: hierarchical.py, summarizer.py
+
+
+--------------------------------------------------------------------------------
+5. TABLES STAY INTACT, AND HEADERS ARE REPEATED
+--------------------------------------------------------------------------------
+NORMAL: Splits every 500 characters. Cuts straight through tables.
+
+MINE:   Tables are treated as ATOMIC chunks. If a table is too big and must
+        be split, the HEADER ROW IS COPIED INTO EVERY PIECE.
+
+        So instead of:      | 469.80 | 349.63 |
+        every chunk keeps:  | Particulars | Quarter Ended 30-09-2025 | ...
+                            | Finance cost | 469.80 | ...
+
+WHY IT MATTERS: This is what makes the numbers mean something. It directly
+solves PROBLEM 2, which is the single biggest source of wrong answers in
+financial RAG.
+
+Code: chunker.py -> _split_table_markdown()
+
+
+--------------------------------------------------------------------------------
+6. IT CAN READ CHARTS
+--------------------------------------------------------------------------------
+NORMAL: Text only. Charts and graphs are skipped entirely.
+
+MINE:   A vision model looks at every meaningful image DURING INDEXING and
+        converts it into a markdown table of the underlying data. That
+        description becomes an ordinary searchable chunk.
+
+WHY "DURING INDEXING" MATTERS: the cost is paid once, when the document is
+uploaded. Queries pay nothing extra. The chart is just text by the time
+anyone asks a question, so both FAISS and BM25 can find it.
+
+Also filters out logos, dividers and page furniture first so we don't spend
+vision tokens on decoration.
+
+This solves PROBLEM 3.
+
+Code: vision.py
+
+
+--------------------------------------------------------------------------------
+7. IT UNDERSTANDS THE INDIAN FISCAL CALENDAR
+--------------------------------------------------------------------------------
+NORMAL: Searches for whatever the user typed. "Q2 FY26" finds nothing.
+
+MINE:   Expands the SEARCH query with the date-ended phrasing:
+
+          Q2 FY26  ->  "quarter ended 30-09-2025"  +  "30 September 2025"
+          H1 FY26  ->  "half year ended 30-09-2025"
+          FY26     ->  "year ended 31-03-2026"
+
+        Important: only the RETRIEVAL query is expanded. The question shown
+        to the model is unchanged - we widen recall without changing what
+        was asked.
+
+WHY IT MATTERS: This is domain knowledge, not a library feature. It solves
+PROBLEM 6, and it is the clearest proof that we understood the domain
+rather than just wiring up a tutorial.
+
+Code: chat.py -> expand_fiscal_terms()
+
+
+--------------------------------------------------------------------------------
+8. TWO-STAGE RETRIEVAL WITH A RERANKER
+--------------------------------------------------------------------------------
+NORMAL: Take the top 5 from the vector database. Done.
+
+MINE:   Stage 1 - pull ~30 candidates cheaply (hybrid search)
+        Stage 2 - re-score those 30 with a CROSS-ENCODER, keep the best few
+
+DIFFERENCE BETWEEN THE TWO MODELS (common interview question):
+  Bi-encoder (used for embeddings): question and document are encoded
+    SEPARATELY into vectors and compared. Fast, because documents can be
+    encoded once in advance - but the model never sees the pair together.
+  Cross-encoder (the reranker): question and document go through the model
+    TOGETHER, so it can compare them directly. Much more accurate, far too
+    slow to run over the whole document.
+
+So: stage 1 gets RECALL cheaply, stage 2 gets PRECISION on a small set.
+
+Code: rerank.py
+
+
+--------------------------------------------------------------------------------
+9. DIFFERENT QUESTIONS TAKE DIFFERENT PATHS
+--------------------------------------------------------------------------------
+NORMAL: One pipeline for everything.
+
+MINE:   The question is classified first, and the strategy changes:
+          factual     -> chunk level, narrow and precise
+          summary     -> page + document level, wider recall
+          comparison  -> all levels, larger top-k
+          "page 19"   -> skips embedding search entirely and looks up the
+                         page directly
+          "hi"        -> answered instantly, no retrieval, no LLM cost
+
+WHY THE PAGE-NUMBER CASE IS INTERESTING: "summarise page 19" is almost
+meaningless to an embedding - that sentence is no closer to page 19 than to
+page 20. It is a lookup problem disguised as a question, so we treat it as
+a lookup.
+
+Code: intelligence.py -> route_query(), _direct_page_lookup()
+
+
+--------------------------------------------------------------------------------
+10. IT DEGRADES INSTEAD OF CRASHING
+--------------------------------------------------------------------------------
+NORMAL: One API fails -> 500 error -> blank screen.
+
+MINE:   Every external dependency has a fallback:
+          reranker down    -> use the original ranking
+          vision down      -> index the text, skip the images
+          summariser down  -> answer from raw chunks
+          main LLM down    -> return the retrieved evidence WITH citations
+
+WHY IT MATTERS: the system gets less fluent as things fail, but it never
+becomes less grounded, and the user never gets an error page.
+
+
+--------------------------------------------------------------------------------
+11. BUILT LIKE A SERVICE, NOT A DEMO
+--------------------------------------------------------------------------------
+NORMAL: A single script or notebook.
+
+MINE:   FastAPI service with 12+ endpoints, streaming answers over SSE,
+        background indexing with progress polling, bearer auth, per-IP rate
+        limiting, security headers, Prometheus metrics, structured JSON
+        logging with request tracing, and an evaluation harness that scores
+        retrieval recall, citation precision, refusal accuracy and
+        faithfulness against a hand-labelled question set.
+
+
+================================================================================
+PART 3 - THE ONE-PARAGRAPH SUMMARY
+================================================================================
+
+"Most RAG chatbots are a vector database with a chat box on top. Financial
+documents break that in three specific ways - tables lose their headers when
+chunked, charts are invisible to text-only retrieval, and users ask for
+'Q2 FY26' while the filing says 'quarter ended 30-09-2025'. We solved each
+one directly: tables are chunked atomically with headers replayed into every
+split, charts are captioned by a vision model at index time so they become
+searchable text, and fiscal shorthand is expanded on the retrieval query.
+On top of that, retrieval is hybrid - FAISS and BM25 fused with reciprocal
+rank fusion, then reranked by a cross-encoder - and the system refuses to
+answer BEFORE calling the LLM if the retrieval scores are too weak. That last
+part matters most: in finance a wrong number is worse than no answer, so we
+removed the opportunity to hallucinate rather than just instructing against
+it."
+
+
+================================================================================
+PART 4 - BE HONEST ABOUT THESE
+================================================================================
+
+If asked what is weak or unfinished, say these - knowing your own gaps reads
+much better than being caught out:
+
+  - Chunks are embedded without document context. A table fragment doesn't
+    know it came from the H1 FY26 consolidated statement. We already compute
+    page summaries, so prepending them before embedding is the highest-value
+    improvement still available. This is what I'd do next.
+
+  - The evaluation set is only 8 questions - too small to prove an
+    improvement helped. Expanding it gates every other change.
+
+  - Intent routing changes RETRIEVAL but not the prompt. The intent value is
+    passed to the generation function and currently ignored.
+
+  - The keyword (BM25) search scores every chunk in Python on every query.
+    That, not FAISS, is what would break first at scale.

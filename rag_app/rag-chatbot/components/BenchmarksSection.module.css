@@ -1,0 +1,129 @@
+.section {
+  padding: 96px 32px;
+  border-top: 1px solid var(--border);
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.label {
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 400;
+  letter-spacing: -1px;
+  color: #f0f0f0;
+  margin-bottom: 32px;
+  line-height: 1.12;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  transition: all 0.15s;
+}
+
+.tab:hover { color: var(--text); }
+
+.tabActive {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: var(--border2);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 700px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rowLabel {
+  font-size: 12.5px;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  min-width: 200px;
+}
+
+.rowLabelTop {
+  color: var(--accent);
+}
+
+.barWrap {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--border2);
+  transition: width 0.5s ease;
+}
+
+.barTop {
+  background: var(--accent);
+}
+
+.score {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  min-width: 46px;
+  text-align: right;
+}
+
+.footer {
+  margin-top: 28px;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  border: 1px solid var(--border2);
+  background: transparent;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.link:hover {
+  color: var(--text);
+  border-color: #444;
+  background: var(--surface);
+}

@@ -1,0 +1,131 @@
+.section {
+  padding: 96px 32px;
+  border-top: 1px solid var(--border);
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.label {
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 400;
+  letter-spacing: -1px;
+  color: #f0f0f0;
+  margin-bottom: 40px;
+  line-height: 1.12;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 720px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.codeBlock {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.codeHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.dotR { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; display: inline-block; }
+.dotY { width: 10px; height: 10px; border-radius: 50%; background: #febc2e; display: inline-block; }
+.dotG { width: 10px; height: 10px; border-radius: 50%; background: #28c840; display: inline-block; }
+
+.codeTitle {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+
+.pre {
+  padding: 20px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: #a8b4c0;
+  overflow-x: auto;
+  line-height: 1.7;
+}
+
+.key  { color: #7dd3a8; }
+.str  { color: #fbbf24; }
+.num  { color: #60a5fa; }
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  vertical-align: top;
+}
+
+.tdKey {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* Info box */
+.infoBox {
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.infoTitle {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.infoText {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}

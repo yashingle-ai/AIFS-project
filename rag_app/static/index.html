@@ -1,0 +1,1649 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DocChat — Grounded RAG</title>
+  <meta name="description" content="Conversational AI grounded in your documents. Every answer is cited; if the answer isn't in the document, the model refuses." />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>📄</text></svg>" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ink:   { 950:'#07080c', 900:'#0c0e13', 850:'#10131a', 800:'#161a23', 700:'#1d2330', 600:'#2a3142', 500:'#3a4156', 400:'#5a6278', 300:'#9aa3b8', 200:'#cbd1de', 100:'#e6e8ee' },
+            accent:{ 400:'#86efac', 500:'#34d399', 600:'#10b981', 700:'#059669' },
+            warn:  { 400:'#fbbf24', 500:'#f59e0b' },
+            danger:{ 400:'#fca5a5', 500:'#ef4444' },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+          boxShadow: {
+            glow: '0 0 0 1px rgba(52,211,153,0.35), 0 8px 30px -8px rgba(52,211,153,0.25)',
+            ring: '0 0 0 2px rgba(52,211,153,0.6)',
+          },
+          keyframes: {
+            pulseSoft: { '0%,100%': { opacity: 1 }, '50%': { opacity: .55 } },
+            slideIn:   { '0%': { opacity:0, transform:'translateY(4px)' }, '100%': { opacity:1, transform:'translateY(0)' } },
+            toastIn:   { '0%': { opacity:0, transform:'translateY(8px) scale(.98)' }, '100%': { opacity:1, transform:'translateY(0) scale(1)' } },
+            shimmer:   { '0%': { backgroundPosition:'-200% 0' }, '100%': { backgroundPosition:'200% 0' } },
+          },
+          animation: {
+            'pulse-soft': 'pulseSoft 1.4s ease-in-out infinite',
+            'slide-in':   'slideIn .25s ease-out',
+            'toast-in':   'toastIn .2s ease-out',
+            shimmer:      'shimmer 1.6s linear infinite',
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Pinned to 7.x: Babel 8 defaults JSX to the automatic runtime, which emits
+       `import ... from "react/jsx-runtime"` and breaks this classic (non-module) script. -->
+  <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+  <script src="https://unpkg.com/marked@13/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+
+  <style>
+    html, body, #root { height: 100%; }
+    body { background: #07080c; color: #e6e8ee; }
+
+    /* Focus-visible ring (HCI: visible focus for keyboard users) */
+    *:focus { outline: none; }
+    *:focus-visible { outline: 2px solid rgba(52,211,153,0.7); outline-offset: 2px; border-radius: 4px; }
+
+    /* Scrollbar */
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-thumb { background: #2a3142; border-radius: 8px; }
+    *::-webkit-scrollbar-thumb:hover { background: #3a4156; }
+    *::-webkit-scrollbar-track { background: transparent; }
+
+    /* Citation chip */
+    .cite-chip {
+      display: inline-flex; align-items: center;
+      padding: 1px 7px; margin: 0 2px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 11px; font-weight: 600;
+      color: #86efac; background: rgba(52,211,153,0.10);
+      border: 1px solid rgba(52,211,153,0.40);
+      border-radius: 6px; cursor: pointer;
+      transition: all .12s ease;
+      vertical-align: 1px;
+    }
+    .cite-chip:hover { background: rgba(52,211,153,0.20); border-color: rgba(52,211,153,0.7); transform: translateY(-1px); }
+    .cite-chip:active { transform: translateY(0); }
+
+    /* Markdown body */
+    .md p { margin: 0.4em 0; line-height: 1.6; }
+    .md ul { list-style: disc; padding-left: 1.25em; margin: 0.4em 0; }
+    .md ol { list-style: decimal; padding-left: 1.25em; margin: 0.4em 0; }
+    .md li { margin: 0.15em 0; }
+    .md code { background:#161a23; border:1px solid #2a3142; padding:1px 5px; border-radius:4px; font-size: 12px; }
+    .md pre { background:#0c0e13; border:1px solid #2a3142; padding:10px 12px; border-radius:8px; overflow:auto; font-size:12px; }
+    .md table { border-collapse: collapse; margin: 0.5em 0; font-size: 13px; }
+    .md th, .md td { border: 1px solid #2a3142; padding: 4px 8px; text-align: left; }
+    .md th { background: #10131a; }
+    .md strong { color:#f3f4f6; }
+    .md hr { border: none; border-top: 1px solid #2a3142; margin: 0.8em 0; }
+    .md a { color: #86efac; text-decoration: underline; text-decoration-color: rgba(52,211,153,.4); }
+
+    /* Skeleton shimmer */
+    .skel {
+      background: linear-gradient(90deg, #161a23 0%, #1d2330 50%, #161a23 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.6s linear infinite;
+      border-radius: 6px;
+    }
+
+    /* Tooltip (CSS-only, hover/focus) */
+    [data-tip] { position: relative; }
+    [data-tip]:hover::after, [data-tip]:focus-visible::after {
+      content: attr(data-tip);
+      position: absolute; z-index: 50;
+      bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: #161a23; border: 1px solid #2a3142; color: #e6e8ee;
+      padding: 4px 8px; border-radius: 6px; font-size: 11px;
+      white-space: nowrap; pointer-events: none;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased">
+  <!-- Skip link for keyboard / screen reader users -->
+  <a href="#composer" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-1.5 focus:rounded focus:bg-accent-500 focus:text-ink-950">
+    Skip to composer
+  </a>
+  <div id="root" role="application" aria-label="Document RAG chat"></div>
+
+  <script type="text/babel" data-presets="env,react">
+  const { useEffect, useState, useRef, useMemo, useCallback } = React;
+
+  // ---------- API helpers ----------
+  function authHeaders() {
+    const t = localStorage.getItem('rag_token');
+    return t ? { 'Authorization': `Bearer ${t}` } : {};
+  }
+  async function jfetch(url, opts = {}) {
+    const r = await fetch(url, {
+      ...opts,
+      headers: { ...(opts.headers || {}), ...authHeaders() },
+    });
+    if (!r.ok) {
+      let msg = r.statusText;
+      try { msg = (await r.json()).detail || msg; } catch {}
+      const err = new Error(msg); err.status = r.status; throw err;
+    }
+    return r.status === 204 ? null : r.json();
+  }
+  const api = {
+    info()        { return jfetch('/api/info'); },
+    listDocs()    { return jfetch('/api/documents'); },
+    getDoc(id)    { return jfetch(`/api/documents/${id}`); },
+    deleteDoc(id) { return jfetch(`/api/documents/${id}`, { method:'DELETE' }); },
+    upload(file) {
+      const fd = new FormData(); fd.append('file', file);
+      return jfetch('/api/documents', { method:'POST', body: fd });
+    },
+    chat(docId, body) {
+      return jfetch(`/api/documents/${docId}/chat`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+    },
+    suggestions(docId) { return jfetch(`/api/documents/${docId}/suggestions`); },
+    feedback(body) {
+      return jfetch('/api/feedback', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+    },
+    /**
+     * SSE streaming chat. Returns an AbortController so the caller can cancel.
+     * Calls handlers as events stream in.
+     */
+    chatStream(docId, body, { onMeta, onToken, onDone, onError }) {
+      const ctrl = new AbortController();
+      (async () => {
+        let resp;
+        try {
+          resp = await fetch(`/api/documents/${docId}/chat/stream`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json', ...authHeaders()},
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+          });
+        } catch (e) { onError?.(e); return; }
+        if (!resp.ok) {
+          let detail = resp.statusText;
+          try { detail = (await resp.json()).detail || detail; } catch {}
+          const err = new Error(detail); err.status = resp.status;
+          onError?.(err); return;
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            // Parse SSE frames separated by blank lines
+            let idx;
+            while ((idx = buffer.indexOf('\n\n')) >= 0) {
+              const raw = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + 2);
+              const lines = raw.split('\n');
+              let event = 'message', data = '';
+              for (const line of lines) {
+                if (line.startsWith('event:')) event = line.slice(6).trim();
+                else if (line.startsWith('data:')) data += line.slice(5).trim();
+              }
+              if (!data) continue;
+              let payload; try { payload = JSON.parse(data); } catch { continue; }
+              if (event === 'meta')   onMeta?.(payload);
+              else if (event === 'token') onToken?.(payload);
+              else if (event === 'done')  onDone?.(payload);
+              else if (event === 'error') onError?.(new Error(payload.detail || 'stream error'));
+            }
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') onError?.(e);
+        }
+      })();
+      return ctrl;
+    },
+    pdfUrl(docId) { return `/api/documents/${docId}/pdf`; },
+    imageUrl(docId, file) { return `/api/documents/${docId}/images/${file}`; },
+  };
+
+  // ---------- Inline SVG icons ----------
+  const I = {
+    Doc:    p => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+    Plus:   p => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 5v14M5 12h14"/></svg>,
+    Trash:  p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+    Send:   p => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
+    Reset:  p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>,
+    Bug:    p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 7l-3 2M5 7l3 2M19 13h-3M5 13h3M19 19l-3-2M5 19l3-2M9 6V4a3 3 0 0 1 6 0v2"/></svg>,
+    Check:  p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="20 6 9 17 4 12"/></svg>,
+    Spark:  p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+    Loader: p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin" {...p}><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>,
+    Chip:   p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>,
+    File:   p => <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+    Copy:   p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+    Down:   p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="6 9 12 15 18 9"/></svg>,
+    Lock:   p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+    Quote:  p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 .987 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/></svg>,
+    Warn:   p => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+    Memory: p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 8V4H8"/><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 14h20M2 9h20"/><path d="M6 14v2M10 14v2M14 14v2M18 14v2"/></svg>,
+    Edit:   p => <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+    Bubble: p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+    ThumbsUp:   p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>,
+    ThumbsDown: p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>,
+    Stop:   p => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>,
+    Coin:   p => <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9"/><path d="M9 9h4.5a2 2 0 1 1 0 4H9m0 0v4m0-4h6"/></svg>,
+  };
+
+  // ---------- Conversation memory store (per-doc, localStorage-backed) ----------
+  // Key layout:
+  //   convs:{docId}        -> [{ id, title, messages:[], created_at, updated_at }, ...] (newest first)
+  //   active_conv:{docId}  -> convId (string)
+  // Legacy `chat:{docId}` (single conversation per doc) is auto-migrated on first load.
+  const ConvStore = {
+    list(docId) {
+      try { return JSON.parse(localStorage.getItem(`convs:${docId}`) || '[]'); }
+      catch { return []; }
+    },
+    save(docId, list) {
+      localStorage.setItem(`convs:${docId}`, JSON.stringify(list));
+    },
+    create(docId, opts = {}) {
+      const conv = {
+        id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+        title: opts.title || 'New chat',
+        messages: opts.messages || [],
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      this.save(docId, [conv, ...this.list(docId)]);
+      return conv;
+    },
+    update(docId, convId, patch) {
+      const list = this.list(docId);
+      const i = list.findIndex(c => c.id === convId);
+      if (i < 0) return null;
+      // Bring the updated conv to the top so most-recent shows first
+      const merged = { ...list[i], ...patch, updated_at: Date.now() };
+      list.splice(i, 1);
+      this.save(docId, [merged, ...list]);
+      return merged;
+    },
+    remove(docId, convId) {
+      this.save(docId, this.list(docId).filter(c => c.id !== convId));
+      if (this.activeId(docId) === convId) this.setActive(docId, null);
+    },
+    activeId(docId) {
+      return localStorage.getItem(`active_conv:${docId}`);
+    },
+    setActive(docId, convId) {
+      if (convId) localStorage.setItem(`active_conv:${docId}`, convId);
+      else        localStorage.removeItem(`active_conv:${docId}`);
+    },
+    /** One-time migration: convert legacy `chat:{docId}` blob to a named conversation. */
+    migrateLegacy(docId) {
+      const k = `chat:${docId}`;
+      const raw = localStorage.getItem(k);
+      if (!raw) return null;
+      try {
+        const messages = JSON.parse(raw);
+        localStorage.removeItem(k);
+        if (!Array.isArray(messages) || messages.length === 0) return null;
+        const firstUser = messages.find(m => m.role === 'user');
+        const title = autoTitle(firstUser ? firstUser.content : 'Imported chat');
+        return this.create(docId, { title, messages });
+      } catch { localStorage.removeItem(k); return null; }
+    },
+
+    /** Cross-document recent-chat listing. Filters out:
+     *    - empty conversations (no user messages yet)
+     *    - chats whose doc was deleted (orphans)
+     * Returns up to `limit` items sorted by updated_at desc, each shaped as
+     *    { docId, docName, conv: { id, title, messages, updated_at, ... } }
+     */
+    allRecent(docs, limit = 12) {
+      const known = new Map(docs.map(d => [d.id, d]));
+      const recents = [];
+      // Walk every localStorage key for convs:*
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith('convs:')) continue;
+        const docId = k.slice('convs:'.length);
+        const doc = known.get(docId);
+        if (!doc) continue;             // orphan → skip
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(k) || '[]'); } catch { continue; }
+        for (const c of list) {
+          if (!c.messages || c.messages.length === 0) continue;
+          recents.push({ docId, docName: doc.name, conv: c });
+        }
+      }
+      recents.sort((a, b) => (b.conv.updated_at || 0) - (a.conv.updated_at || 0));
+      return recents.slice(0, limit);
+    },
+  };
+
+  function autoTitle(text) {
+    const t = (text || '').replace(/\s+/g, ' ').trim();
+    if (!t) return 'New chat';
+    return t.length > 48 ? t.slice(0, 48).trim() + '…' : t;
+  }
+
+  function relTime(ts) {
+    const d = Math.max(0, (Date.now() - ts) / 1000);
+    if (d < 45) return 'just now';
+    if (d < 90) return '1 min ago';
+    if (d < 3600)  return `${Math.floor(d/60)} min ago`;
+    if (d < 7200)  return '1 hr ago';
+    if (d < 86400) return `${Math.floor(d/3600)} hr ago`;
+    if (d < 86400*2) return 'yesterday';
+    if (d < 86400*7) return `${Math.floor(d/86400)} d ago`;
+    return new Date(ts).toLocaleDateString();
+  }
+
+  // ---------- Toast system (HCI: feedback for every async action) ----------
+  const ToastCtx = React.createContext(() => {});
+  function ToastProvider({ children }) {
+    const [items, setItems] = useState([]);
+    const push = useCallback((toast) => {
+      const id = Math.random().toString(36).slice(2);
+      const item = { id, kind: 'info', timeout: 3500, ...toast };
+      setItems(s => [...s, item]);
+      if (item.timeout > 0) {
+        setTimeout(() => setItems(s => s.filter(x => x.id !== id)), item.timeout);
+      }
+      return id;
+    }, []);
+    const dismiss = (id) => setItems(s => s.filter(x => x.id !== id));
+    return (
+      <ToastCtx.Provider value={push}>
+        {children}
+        <div className="fixed bottom-4 right-4 z-50 space-y-2 w-[320px]" role="region" aria-live="polite">
+          {items.map(t => (
+            <div key={t.id} role="status"
+              className={`animate-toast-in rounded-lg border shadow-lg p-3 text-[13px] flex items-start gap-2
+                ${t.kind === 'error' ? 'bg-rose-500/10 border-rose-500/40 text-rose-200'
+                  : t.kind === 'success' ? 'bg-accent-500/10 border-accent-500/40 text-accent-400'
+                  : t.kind === 'warn' ? 'bg-warn-500/10 border-warn-500/40 text-warn-400'
+                  : 'bg-ink-850 border-ink-600 text-ink-100'}`}>
+              <div className="mt-0.5">
+                {t.kind === 'error' ? <I.Warn/> : t.kind === 'success' ? <I.Check/> : <I.Spark/>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{t.title}</div>
+                {t.body && <div className="text-ink-300 mt-0.5 text-[12px]">{t.body}</div>}
+              </div>
+              <button onClick={()=>dismiss(t.id)} aria-label="Dismiss" className="text-ink-400 hover:text-ink-100 px-1">✕</button>
+            </div>
+          ))}
+        </div>
+      </ToastCtx.Provider>
+    );
+  }
+  const useToast = () => React.useContext(ToastCtx);
+
+  // ---------- Status pill ----------
+  const StatusPill = ({ status, error }) => {
+    const map = {
+      pending:  { c:'text-amber-300 bg-amber-500/10 border-amber-500/30',   label:'queued' },
+      indexing: { c:'text-sky-300 bg-sky-500/10 border-sky-500/30',          label:'indexing' },
+      ready:    { c:'text-accent-400 bg-accent-500/10 border-accent-500/30', label:'ready' },
+      error:    { c:'text-rose-300 bg-rose-500/10 border-rose-500/30',       label:'error' },
+    };
+    const s = map[status] || map.pending;
+    return (
+      <span title={error || ''} aria-label={`status: ${s.label}`}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${s.c}`}>
+        {(status === 'indexing' || status === 'pending') ? <I.Loader/> : status==='ready' ? <I.Check/> : null}
+        {s.label}
+      </span>
+    );
+  };
+
+  // ---------- Confidence pill (HCI: visibility of system status) ----------
+  function confidenceFor(hits) {
+    if (!hits || !hits.length) return null;
+    // best dense + best bm25, normalized
+    const d = Math.max(...hits.map(h => h.dense_score || 0));
+    const b = Math.max(...hits.map(h => h.sparse_score || 0));
+    // Empirical: dense >= 0.7 (gemini) or 0.55 (nvidia) is "strong"; bm25 >= 6 is strong support
+    const strong = d >= 0.55 || b >= 6;
+    const medium = d >= 0.40 || b >= 2.5;
+    if (strong)  return { label: 'strong support',  c: 'text-accent-400 bg-accent-500/10 border-accent-500/30' };
+    if (medium)  return { label: 'partial support', c: 'text-warn-400 bg-warn-500/10 border-warn-500/30' };
+    return         { label: 'weak support',    c: 'text-rose-300 bg-rose-500/10 border-rose-500/30' };
+  }
+
+  // ---------- Sidebar: docs ----------
+  // ---------- Recent Chats panel (cross-doc resume) ----------
+  const RecentChats = ({ docs, onResume, refreshKey }) => {
+    const [items, setItems] = useState([]);
+    useEffect(() => { setItems(ConvStore.allRecent(docs, 8)); }, [docs, refreshKey]);
+
+    if (items.length === 0) return null;
+
+    return (
+      <div className="px-3 pb-2 pt-1">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-ink-400">Recent chats</div>
+          <span className="text-[10px] text-ink-500" data-tip="Saved in this browser. Server-side conversations come in the SQLite milestone.">
+            local
+          </span>
+        </div>
+        <div className="space-y-1">
+          {items.map(({ docId, docName, conv }) => {
+            const lastUserMsg = [...conv.messages].reverse().find(m => m.role === 'user');
+            return (
+              <button key={`${docId}-${conv.id}`}
+                onClick={() => onResume(docId, conv.id)}
+                className="w-full text-left px-2.5 py-2 rounded-md bg-ink-850 hover:bg-ink-800 border border-transparent hover:border-ink-600 transition group">
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12.5px] text-ink-100 truncate" title={conv.title}>
+                      {conv.title}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-ink-400 truncate flex items-center gap-1.5" title={docName}>
+                      <I.Doc className="opacity-50 shrink-0"/>
+                      <span className="truncate">{docName}</span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-ink-500 shrink-0 mt-0.5">{relTime(conv.updated_at)}</div>
+                </div>
+                {lastUserMsg && (
+                  <div className="mt-1 text-[10.5px] text-ink-400 italic truncate opacity-80 group-hover:opacity-100">
+                    "{lastUserMsg.content.slice(0, 60)}{lastUserMsg.content.length > 60 ? '…' : ''}"
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const Sidebar = ({ docs, activeId, onSelect, onUpload, onDelete, onResume, info, recentRefreshKey }) => {
+    const inputRef = useRef(null);
+    const [drag, setDrag] = useState(false);
+    const toast = useToast();
+
+    const handleFiles = (files) => {
+      const pdfs = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+      if (pdfs.length === 0) {
+        toast({ kind: 'warn', title: 'No PDFs detected', body: 'Drop one or more .pdf files.' });
+        return;
+      }
+      pdfs.forEach(onUpload);
+    };
+
+    return (
+      <aside className="w-72 shrink-0 h-full border-r border-ink-700 bg-ink-900 flex flex-col" aria-label="Documents sidebar">
+        <div className="p-4 border-b border-ink-700">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-accent-500/10 border border-accent-500/30 grid place-items-center text-accent-400">
+              <I.Doc/>
+            </div>
+            <div className="leading-tight">
+              <div className="font-semibold tracking-tight">DocChat</div>
+              <div className="text-[11px] text-ink-400">grounded · cited · refusal-safe</div>
+            </div>
+          </div>
+          {info && (
+            <div className="mt-3 text-[11px] space-y-1" aria-label="Backend information">
+              <div className="flex items-center gap-1.5" data-tip="Language model used to answer">
+                <I.Spark className="text-accent-400"/>
+                <span className="text-ink-400">LLM</span>
+                <span className="font-mono text-ink-200 truncate" title={info.llm_model}>
+                  {info.llm_backend} · {info.llm_model.split('/').pop()}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5" data-tip="Embedding model used for retrieval">
+                <I.Chip className="text-accent-400"/>
+                <span className="text-ink-400">Embed</span>
+                <span className="font-mono text-ink-200 truncate" title={info.embed_model}>
+                  {info.embed_backend} · {info.embed_model.split('/').pop()}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div
+          role="button" tabIndex={0}
+          aria-label="Upload PDF (drop or click)"
+          onDragOver={e=>{e.preventDefault();setDrag(true);}}
+          onDragLeave={()=>setDrag(false)}
+          onDrop={e=>{e.preventDefault();setDrag(false);handleFiles(e.dataTransfer.files);}}
+          onKeyDown={e=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); inputRef.current?.click(); }}}
+          className={`m-3 rounded-lg border-2 border-dashed transition cursor-pointer
+            ${drag ? 'border-accent-500 bg-accent-500/5' : 'border-ink-600 hover:border-ink-500'}
+            p-4 text-center`}
+          onClick={()=>inputRef.current?.click()}
+        >
+          <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden
+            onChange={e=>handleFiles(e.target.files)}/>
+          <I.Plus className="mx-auto text-ink-400"/>
+          <div className="mt-2 text-xs text-ink-200">Drop a PDF or click to upload</div>
+          <div className="text-[10px] text-ink-400 mt-0.5">PDF only · up to 50 MB</div>
+        </div>
+
+        <RecentChats docs={docs} onResume={onResume} refreshKey={recentRefreshKey}/>
+
+        <div className="px-3 pb-2 pt-2 text-[10px] uppercase tracking-wider text-ink-400 border-t border-ink-800">Documents</div>
+        <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-1" role="list">
+          {docs.length === 0 && (
+            <div className="text-[12px] text-ink-400 px-2 py-4 text-center">No documents yet.</div>
+          )}
+          {docs.map(d => (
+            <div key={d.id} role="listitem" tabIndex={0}
+              onClick={()=>onSelect(d.id)}
+              onKeyDown={e=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); onSelect(d.id); }}}
+              aria-current={activeId === d.id}
+              className={`group rounded-md px-2.5 py-2 cursor-pointer border transition
+                ${activeId === d.id
+                  ? 'bg-accent-500/10 border-accent-500/30'
+                  : 'bg-ink-850 border-ink-700 hover:border-ink-600'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm truncate" title={d.name}>{d.name}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-400">
+                    <StatusPill status={d.status} error={d.error}/>
+                    {d.status === 'ready' && (
+                      <span>
+                        {d.pages}p · {d.chunks}c
+                        {d.table_chunks ? ` · ${d.table_chunks}t` : ''}
+                        {d.image_chunks ? ` · ${d.image_chunks}i` : ''}
+                      </span>
+                    )}
+                    {d.status === 'indexing' && d.stage && (
+                      <span className="truncate text-sky-300" title={d.stage}>{d.stage}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  aria-label={`Delete ${d.name}`}
+                  data-tip="Delete"
+                  onClick={e=>{e.stopPropagation();if(confirm(`Delete "${d.name}"?`)) onDelete(d.id);}}
+                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-ink-400 hover:text-rose-400 p-1 -m-1 rounded">
+                  <I.Trash/>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-4 py-3 border-t border-ink-700 text-[10px] text-ink-400 space-y-1">
+          <div data-tip="Reciprocal Rank Fusion of dense + sparse">Hybrid: FAISS + BM25 · RRF</div>
+          <div className="flex items-center gap-1 text-ink-500"><I.Lock/> data stays on this machine</div>
+        </div>
+      </aside>
+    );
+  };
+
+  // ---------- Suggested questions ----------
+  const SUGGESTIONS = [
+    "What are the major business segments discussed in the document?",
+    "What are the key financial highlights for the most recent period?",
+    "What drivers are mentioned for the changes in EBITDA?",
+    "Summarize the strategic partnerships and investments mentioned.",
+  ];
+
+  // ---------- Answer parser ----------
+  // Splits the LLM's "Answer: ... Evidence: - [pX:cY] '...'" into structured pieces
+  // so we can render them as separate, well-styled blocks (no raw labels in UI).
+  function parseAnswer(text) {
+    if (!text) return { answer: '', evidence: [] };
+    let body = text.trim();
+
+    // Strip leading "Answer:" label (and "**Answer:**" markdown variants)
+    body = body.replace(/^[\s>]*\**\s*answer\s*[:：]\s*/i, '');
+
+    // Find the Evidence section anywhere
+    const m = body.match(/(?:^|\n)\s*\**\s*evidence\s*[:：]\s*/i);
+    let answer = body, evidenceRaw = '';
+    if (m) {
+      answer      = body.slice(0, m.index).trim();
+      evidenceRaw = body.slice(m.index + m[0].length).trim();
+    }
+    // Trim trailing stray markdown bolds
+    answer = answer.replace(/^\**\s*/, '').replace(/\s*\**$/, '');
+
+    // Parse evidence bullets: each starts with - / • / * / number.
+    const evidence = [];
+    if (evidenceRaw) {
+      const lines = evidenceRaw.split(/\r?\n/);
+      let cur = '';
+      const flush = () => {
+        const v = cur.trim();
+        if (!v) return;
+        // Pull citation tags out of the line (there can be more than one)
+        const tags = [...v.matchAll(/\[((?:[A-Za-z0-9._-]+:)?p\d+(?::c\d+)?)\]/g)].map(x => `[${x[1]}]`);
+        // Pull a quoted snippet if present
+        const q = v.match(/[“"](.+?)["”]/);
+        const quote = q ? q[1] : v.replace(/^[-•*]\s*/, '').replace(/\[(p\d+(?::c\d+)?)\]/g, '').trim();
+        const cleanQuote = quote.replace(/\[((?:[A-Za-z0-9._-]+:)?p\d+(?::c\d+)?)\]/g, '').trim();
+        evidence.push({ tags, quote: cleanQuote });
+      };
+      for (const line of lines) {
+        if (/^\s*([-•*]|\d+[.)])\s+/.test(line)) {
+          flush();
+          cur = line.replace(/^\s*([-•*]|\d+[.)])\s+/, '');
+        } else if (cur) {
+          cur += ' ' + line.trim();
+        } else {
+          cur = line;
+        }
+      }
+      flush();
+    }
+    return { answer, evidence };
+  }
+
+  // ---------- Render markdown safely + chip up [pX:cY] ----------
+  function renderAnswerHtml(text) {
+    let html = marked.parse(text || '', { breaks: true, gfm: true });
+    // Replace [pX:cY] with chip buttons BEFORE sanitizing so DOMPurify keeps them
+    html = html.replace(/\[((?:[A-Za-z0-9._-]+:)?p\d+(?::c\d+)?)\]/g, (_m, tag) => {
+      const cite = `[${tag}]`;
+      return `<button type="button" class="cite-chip" data-cite="${cite.replace(/"/g,'&quot;')}">${cite}</button>`;
+    });
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['a','b','blockquote','br','code','del','em','h1','h2','h3','h4','h5','h6',
+                     'hr','i','li','ol','p','pre','span','strong','sub','sup','table','tbody',
+                     'td','th','thead','tr','ul','button'],
+      ALLOWED_ATTR: ['href','title','class','data-cite','type','target','rel'],
+      ALLOW_DATA_ATTR: true,
+    });
+  }
+
+  // ---------- Single chat message ----------
+  const Message = ({ msg, doc, onCiteClick, onFeedback, streaming }) => {
+    const isUser = msg.role === 'user';
+    const isNotFound = !isUser && (msg.content || '').trim().toLowerCase().startsWith('not found in the document');
+    const ref = useRef(null);
+    const toast = useToast();
+
+    // Wire citation chip clicks (delegated)
+    useEffect(() => {
+      if (!ref.current || isUser) return;
+      const el = ref.current;
+      const handler = (e) => {
+        const t = e.target.closest('.cite-chip');
+        if (t) onCiteClick?.(t.dataset.cite, msg.hits || []);
+      };
+      el.addEventListener('click', handler);
+      return () => el.removeEventListener('click', handler);
+    });
+
+    if (isUser) {
+      return (
+        <div className="flex justify-end animate-slide-in">
+          <div className="max-w-[78%] rounded-2xl rounded-br-sm bg-accent-500/10 border border-accent-500/20 text-ink-100 px-4 py-2.5">
+            <div className="whitespace-pre-wrap text-[14px] leading-relaxed">{msg.content}</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (isNotFound) {
+      return (
+        <div className="flex justify-start animate-slide-in">
+          <div className="max-w-[88%] w-full">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="w-6 h-6 rounded-md bg-warn-500/10 border border-warn-500/30 grid place-items-center text-warn-400"><I.Warn/></div>
+              <span className="text-[11px] uppercase tracking-wider text-ink-400">refusal</span>
+            </div>
+            <div className="rounded-xl border border-warn-500/30 bg-warn-500/5 text-warn-400 px-4 py-3 text-[14px]">
+              <div className="font-medium">Not found in the document.</div>
+              <div className="text-[12px] mt-1 text-ink-300">
+                Retrieval didn't surface enough supporting context for this question, or the LLM judged the chunks as unrelated. Try rephrasing or check that the right document is selected.
+              </div>
+            </div>
+            {msg.hits?.length > 0 && <RetrievalPanel hits={msg.hits} doc={doc}/>}
+          </div>
+        </div>
+      );
+    }
+
+    const { answer, evidence } = parseAnswer(msg.content);
+    const conf = confidenceFor(msg.hits);
+
+    const copyAnswer = async () => {
+      try {
+        await navigator.clipboard.writeText(answer);
+        toast({ kind: 'success', title: 'Answer copied' });
+      } catch {
+        toast({ kind: 'error', title: 'Copy failed' });
+      }
+    };
+
+    const sendFeedback = async (rating) => {
+      if (msg.feedback) {
+        toast({ kind: 'info', title: `Already marked ${msg.feedback === 'up' ? '👍' : '👎'}` });
+        return;
+      }
+      try {
+        await onFeedback?.(rating);
+        toast({ kind: 'success', title: rating === 'up' ? 'Thanks 👍' : 'Thanks — recorded 👎' });
+      } catch (e) {
+        toast({ kind: 'error', title: 'Feedback failed', body: e.message });
+      }
+    };
+
+    return (
+      <div className="flex justify-start animate-slide-in">
+        <div className="max-w-[88%] w-full">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <div className="w-6 h-6 rounded-md bg-accent-500/10 border border-accent-500/30 grid place-items-center text-accent-400"><I.Doc/></div>
+            <span className="text-[11px] uppercase tracking-wider text-ink-400">assistant</span>
+            {conf && (
+              <span data-tip="Based on retrieval scores"
+                className={`text-[10px] px-1.5 py-0.5 rounded border ${conf.c}`}>
+                {conf.label}
+              </span>
+            )}
+            {msg.rewritten && msg.rewritten.toLowerCase() !== (msg.original_q||'').toLowerCase() && (
+              <span data-tip="The model expanded your question for retrieval"
+                className="text-[10px] text-ink-400 italic truncate max-w-[40ch]">
+                rewritten: "{msg.rewritten}"
+              </span>
+            )}
+            {msg.usage?.total_tokens > 0 && (
+              <span data-tip={`prompt ${msg.usage.prompt_tokens} · completion ${msg.usage.completion_tokens}`}
+                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border border-ink-600 text-ink-300">
+                <I.Coin/> {msg.usage.total_tokens} tok
+              </span>
+            )}
+            <span className="ml-auto"></span>
+            {!streaming && onFeedback && (
+              <>
+                <button onClick={()=>sendFeedback('up')}
+                  aria-label="Helpful" data-tip="Helpful"
+                  className={`p-1 rounded ${msg.feedback==='up' ? 'text-accent-400' : 'text-ink-400 hover:text-accent-400'}`}>
+                  <I.ThumbsUp/>
+                </button>
+                <button onClick={()=>sendFeedback('down')}
+                  aria-label="Not helpful" data-tip="Not helpful"
+                  className={`p-1 rounded ${msg.feedback==='down' ? 'text-rose-400' : 'text-ink-400 hover:text-rose-400'}`}>
+                  <I.ThumbsDown/>
+                </button>
+              </>
+            )}
+            <button onClick={copyAnswer} aria-label="Copy answer" data-tip="Copy answer"
+              className="text-ink-400 hover:text-ink-100 p-1 rounded">
+              <I.Copy/>
+            </button>
+          </div>
+
+          <div ref={ref} className="md text-[14px] text-ink-100 rounded-xl bg-ink-850 border border-ink-700 px-4 py-3 relative"
+               dangerouslySetInnerHTML={{
+                 __html: renderAnswerHtml(answer) + (streaming
+                   ? '<span class="inline-block w-1.5 h-4 align-[-2px] ml-0.5 bg-accent-400 animate-pulse-soft"></span>'
+                   : ''),
+               }}/>
+
+          {!streaming && evidence.length > 0 && (
+            <div className="mt-2 rounded-xl border border-ink-700 bg-ink-900 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-ink-400 flex items-center gap-1 mb-1.5">
+                <I.Quote/> Evidence
+              </div>
+              <ul className="space-y-1.5">
+                {evidence.map((e, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-ink-200 leading-snug">
+                    <div className="flex flex-wrap gap-1 shrink-0 mt-0.5">
+                      {e.tags.map((t, j) => (
+                        <button key={j} className="cite-chip" data-cite={t}
+                          onClick={()=>onCiteClick?.(t, msg.hits || [])}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-ink-200">"{e.quote}"</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {msg.hits && msg.hits.length > 0 && (
+            <RetrievalPanel hits={msg.hits} doc={doc}/>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ---------- Retrieval debug panel ----------
+  const RetrievalPanel = ({ hits, doc, defaultOpen=false }) => {
+    const [open, setOpen] = useState(defaultOpen);
+    const kindColor = (k) => k === 'image' ? 'text-fuchsia-300 border-fuchsia-500/30 bg-fuchsia-500/5'
+                          : k === 'table' ? 'text-amber-300 border-amber-500/30 bg-amber-500/5'
+                          : 'text-ink-400 border-ink-600';
+    return (
+      <div className="mt-2">
+        <button onClick={()=>setOpen(o=>!o)} aria-expanded={open}
+          className="inline-flex items-center gap-1.5 text-[11px] text-ink-400 hover:text-ink-200">
+          <I.Bug/> {open ? 'Hide' : 'Show'} retrieved chunks ({hits.length})
+        </button>
+        {open && (
+          <div className="mt-2 space-y-1.5">
+            {hits.map((h, i) => (
+              <div key={i} className="rounded-lg bg-ink-900 border border-ink-700 p-2.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <span className="cite-chip">{h.citation}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider border ${kindColor(h.kind)}`}>{h.kind}</span>
+                  </div>
+                  <div className="font-mono text-[10px] text-ink-400 flex gap-3">
+                    <span data-tip="Dense cosine similarity">d={h.dense_score.toFixed(3)}</span>
+                    <span data-tip="BM25 sparse score">bm25={h.sparse_score.toFixed(2)}</span>
+                    <span data-tip="Reciprocal Rank Fusion">rrf={h.score.toFixed(4)}</span>
+                    {typeof h.rerank_score === 'number' && h.rerank_score !== 0 && (
+                      <span data-tip="Cross-encoder rerank score">rerank={h.rerank_score.toFixed(2)}</span>
+                    )}
+                  </div>
+                </div>
+                {h.kind === 'image' && h.image_file && doc && (
+                  <div className="mt-2 flex gap-2 items-start">
+                    <img src={api.imageUrl(doc.id, h.image_file)} alt="extracted image"
+                         className="w-24 h-24 object-contain rounded border border-ink-700 bg-ink-950 shrink-0"/>
+                    <div className="text-[12px] text-ink-200 leading-snug max-h-40 overflow-y-auto">
+                      {h.text.length > 600 ? h.text.slice(0, 600) + ' …' : h.text}
+                    </div>
+                  </div>
+                )}
+                {(h.kind !== 'image' || !h.image_file) && (
+                  <div className="mt-1.5 text-[12px] text-ink-200 font-mono whitespace-pre-wrap leading-snug max-h-40 overflow-y-auto">
+                    {h.text.length > 600 ? h.text.slice(0, 600) + ' …' : h.text}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ---------- Loading skeleton (HCI: progress feedback during slow ops) ----------
+  const ChatSkeleton = () => (
+    <div className="flex justify-start animate-slide-in">
+      <div className="max-w-[88%] w-full">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="w-6 h-6 rounded-md skel"></div>
+          <div className="w-24 h-3 skel"></div>
+        </div>
+        <div className="rounded-xl bg-ink-850 border border-ink-700 px-4 py-3 space-y-2">
+          <div className="h-3 w-[90%] skel"></div>
+          <div className="h-3 w-[70%] skel"></div>
+          <div className="h-3 w-[55%] skel"></div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ---------- Composer ----------
+  const Composer = ({ onSend, disabled, onStop, error, onRetry }) => {
+    const [v, setV] = useState('');
+    const taRef = useRef(null);
+    const MAX_CHARS = 2000;
+    const remaining = MAX_CHARS - v.length;
+    const tooLong = remaining < 0;
+
+    useEffect(() => {
+      const t = taRef.current; if (!t) return;
+      t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 220) + 'px';
+    }, [v]);
+
+    const submit = () => {
+      const q = v.trim(); if (!q || disabled || tooLong) return;
+      setV(''); onSend(q);
+    };
+
+    return (
+      <div id="composer" className="border-t border-ink-700 bg-ink-900 px-4 py-3" role="region" aria-label="Composer">
+        <div className="max-w-4xl mx-auto">
+          {error && (
+            <div className="mb-2 rounded-lg border border-rose-500/40 bg-rose-500/5 text-rose-200 px-3 py-2 text-[13px] flex items-start gap-2">
+              <I.Warn className="text-rose-400 mt-0.5"/>
+              <div className="flex-1">{error}</div>
+              {onRetry && <button onClick={onRetry} className="text-rose-200 hover:text-white text-[12px] underline">Retry</button>}
+            </div>
+          )}
+          <div className="rounded-xl border border-ink-600 bg-ink-850 focus-within:border-accent-500/50 focus-within:shadow-glow transition flex items-end gap-2 px-3 py-2">
+            <textarea
+              ref={taRef}
+              rows={1}
+              value={v}
+              onChange={e=>setV(e.target.value)}
+              onKeyDown={e=>{ if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); submit(); }}}
+              placeholder="Ask a question about the document…"
+              disabled={disabled}
+              maxLength={MAX_CHARS + 100}
+              aria-label="Question"
+              className="flex-1 bg-transparent outline-none resize-none text-[14px] placeholder:text-ink-400"/>
+            {disabled && onStop ? (
+              <button onClick={onStop} aria-label="Stop streaming" data-tip="Stop generation"
+                className="rounded-lg p-2 bg-rose-600 hover:bg-rose-500 text-white transition">
+                <I.Stop/>
+              </button>
+            ) : (
+              <button onClick={submit} disabled={disabled || !v.trim() || tooLong}
+                aria-label={disabled ? 'Sending' : 'Send'}
+                className="rounded-lg p-2 bg-accent-600 hover:bg-accent-500 disabled:bg-ink-700 disabled:text-ink-400 text-ink-950 transition">
+                {disabled ? <I.Loader/> : <I.Send/>}
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 px-1 text-[10px] text-ink-400 flex items-center justify-between gap-2">
+            <span>Enter to send · Shift+Enter newline · / to focus</span>
+            <span className={tooLong ? 'text-danger-400' : remaining < 200 ? 'text-warn-400' : ''}>
+              {tooLong ? `over by ${-remaining}` : `${remaining} chars left`}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ---------- Conversation switcher (the "memory" feature) ----------
+  const ConvSwitcher = ({ active, conversations, onSwitch, onNew, onRename, onDelete }) => {
+    const [open, setOpen] = useState(false);
+    const [renaming, setRenaming] = useState(null);  // convId being renamed
+    const [draft, setDraft] = useState('');
+    const ref = useRef(null);
+    const renameRef = useRef(null);
+
+    // Close on outside click / Escape
+    useEffect(() => {
+      if (!open) return;
+      const onClick = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+      const onKey   = e => { if (e.key === 'Escape') setOpen(false); };
+      window.addEventListener('mousedown', onClick);
+      window.addEventListener('keydown', onKey);
+      return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('keydown', onKey); };
+    }, [open]);
+
+    useEffect(() => { if (renaming && renameRef.current) renameRef.current.select(); }, [renaming]);
+
+    const startRename = (c) => { setRenaming(c.id); setDraft(c.title); };
+    const commitRename = () => {
+      const t = draft.trim();
+      if (renaming && t) onRename(renaming, t);
+      setRenaming(null); setDraft('');
+    };
+
+    return (
+      <div ref={ref} className="relative">
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-haspopup="menu" aria-expanded={open}
+          data-tip="Switch or start a new chat"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-ink-600 bg-ink-850 hover:border-ink-500 text-[12px] text-ink-200 max-w-[260px]">
+          <I.Memory className="text-accent-400 shrink-0"/>
+          <span className="truncate">{active?.title || 'New chat'}</span>
+          {active?.messages?.length > 0 && (
+            <span className="text-[10px] text-ink-400 shrink-0">· {active.messages.length}</span>
+          )}
+          <I.Down className="text-ink-400 shrink-0"/>
+        </button>
+
+        {open && (
+          <div role="menu"
+               className="absolute top-full left-0 mt-1 w-[340px] max-h-[60vh] rounded-lg bg-ink-850 border border-ink-600 shadow-xl z-30 flex flex-col animate-slide-in">
+            <div className="px-3 py-2 border-b border-ink-700 flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-ink-400">Conversations</span>
+              <button onClick={() => { onNew(); setOpen(false); }}
+                className="inline-flex items-center gap-1 text-[12px] text-accent-400 hover:text-accent-300 px-1.5 py-1 rounded hover:bg-accent-500/10">
+                <I.Plus/> New chat
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto py-1">
+              {conversations.length === 0 && (
+                <div className="px-3 py-6 text-center text-[12px] text-ink-400">
+                  No past chats for this document.
+                </div>
+              )}
+              {conversations.map(c => {
+                const isActive = c.id === active?.id;
+                const isRenaming = renaming === c.id;
+                return (
+                  <div key={c.id}
+                       onClick={() => { if (!isRenaming) { onSwitch(c.id); setOpen(false); }}}
+                       className={`group px-3 py-2 cursor-pointer border-l-2
+                         ${isActive ? 'border-accent-500 bg-accent-500/5' : 'border-transparent hover:bg-ink-800'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        {isRenaming ? (
+                          <input ref={renameRef} value={draft}
+                                 onChange={e => setDraft(e.target.value)}
+                                 onClick={e => e.stopPropagation()}
+                                 onBlur={commitRename}
+                                 onKeyDown={e => {
+                                   if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                                   if (e.key === 'Escape') { setRenaming(null); setDraft(''); }
+                                 }}
+                                 maxLength={80}
+                                 className="w-full bg-ink-900 border border-accent-500/50 rounded px-1.5 py-0.5 text-sm outline-none"/>
+                        ) : (
+                          <div className="text-sm truncate text-ink-100" title={c.title}>{c.title}</div>
+                        )}
+                        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-ink-400">
+                          <span className="inline-flex items-center gap-1">
+                            <I.Bubble className="opacity-60"/> {c.messages.length} msg{c.messages.length === 1 ? '' : 's'}
+                          </span>
+                          <span>·</span>
+                          <span>{relTime(c.updated_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                        <button onClick={e => { e.stopPropagation(); startRename(c); }}
+                                aria-label="Rename" data-tip="Rename"
+                                className="p-1 -m-1 text-ink-400 hover:text-ink-100 rounded">
+                          <I.Edit/>
+                        </button>
+                        <button onClick={e => {
+                                  e.stopPropagation();
+                                  if (c.messages.length === 0 || confirm(`Delete "${c.title}"?`)) onDelete(c.id);
+                                }}
+                                aria-label="Delete" data-tip="Delete chat"
+                                className="p-1 -m-1 text-ink-400 hover:text-rose-400 rounded">
+                          <I.Trash/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ---------- Main chat pane ----------
+  const ChatPane = ({ doc, info, resumeReq, onTurnSaved, onCiteClick }) => {
+    // Conversation state
+    const [conversations, setConversations] = useState([]);  // newest first
+    const [activeConvId, setActiveConvId] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [streamPartial, setStreamPartial] = useState(null);  // currently-streaming assistant msg
+    const [err, setErr] = useState(null);
+    const [lastQuestion, setLastQuestion] = useState(null);
+    const [showJump, setShowJump] = useState(false);
+    const [suggestions, setSuggestions] = useState(null); // null = loading, [] = none, [...] = ready
+    const streamCtrlRef = useRef(null);
+    const scrollRef = useRef(null);
+    const toast = useToast();
+
+    const active = conversations.find(c => c.id === activeConvId) || null;
+    const messages = active?.messages || [];
+
+    // Load (and migrate) conversations whenever the doc changes
+    // Also honor a resumeReq from the App (Recent Chats click).
+    useEffect(() => {
+      if (!doc) { setConversations([]); setActiveConvId(null); return; }
+      ConvStore.migrateLegacy(doc.id);
+      let list = ConvStore.list(doc.id);
+
+      // Pick which conversation to open:
+      //   1. resumeReq for THIS doc (cross-doc jump from RecentChats) wins
+      //   2. else the doc's last-active id (from localStorage)
+      //   3. else the most-recent conv
+      //   4. else create a fresh "New chat"
+      let pickedId = (resumeReq && resumeReq.docId === doc.id) ? resumeReq.convId : ConvStore.activeId(doc.id);
+      if (list.length === 0) {
+        const c = ConvStore.create(doc.id, { title: 'New chat' });
+        list = [c];
+        pickedId = c.id;
+      } else if (!list.some(c => c.id === pickedId)) {
+        pickedId = list[0].id;
+      }
+      ConvStore.setActive(doc.id, pickedId);
+      setConversations(list);
+      setActiveConvId(pickedId);
+      setErr(null); setLastQuestion(null);
+    }, [doc?.id, resumeReq?.t]);
+
+    // Persist active id
+    useEffect(() => {
+      if (doc && activeConvId) ConvStore.setActive(doc.id, activeConvId);
+    }, [doc?.id, activeConvId]);
+
+    // Fetch LLM-generated suggestions when the doc becomes active (cached server-side per doc)
+    useEffect(() => {
+      if (!doc || doc.status !== 'ready') { setSuggestions([]); return; }
+      let cancelled = false;
+      setSuggestions(null);
+      api.suggestions(doc.id)
+        .then(r => { if (!cancelled) setSuggestions(r.questions || []); })
+        .catch(() => { if (!cancelled) setSuggestions([]); });
+      return () => { cancelled = true; };
+    }, [doc?.id, doc?.status]);
+
+    // Abort any in-flight stream when doc / convo changes or component unmounts
+    useEffect(() => () => streamCtrlRef.current?.abort(), []);
+    useEffect(() => { streamCtrlRef.current?.abort(); streamCtrlRef.current = null; setStreamPartial(null); }, [doc?.id, activeConvId]);
+
+    // Auto-scroll only if user is near the bottom
+    useEffect(() => {
+      const el = scrollRef.current; if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+      if (nearBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }, [messages, busy, activeConvId]);
+
+    const onScroll = () => {
+      const el = scrollRef.current; if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+      setShowJump(!nearBottom);
+    };
+
+    // Helper: write a patched conversation back to storage + state
+    const patchActive = (patch) => {
+      if (!doc || !activeConvId) return;
+      const updated = ConvStore.update(doc.id, activeConvId, patch);
+      if (updated) {
+        setConversations(ConvStore.list(doc.id));
+        // Notify App so the Recent Chats panel re-reads localStorage.
+        onTurnSaved?.();
+      }
+    };
+
+    const send = (q) => {
+      if (!doc || !activeConvId) return;
+      setErr(null); setLastQuestion(q);
+      const history = messages.map(m => ({ role: m.role, content: m.content }));
+      const nextMsgs = [...messages, { role: 'user', content: q }];
+      // Title: auto-name from first user message if conv is still "New chat"
+      const titlePatch = (active.title === 'New chat' && messages.length === 0) ? { title: autoTitle(q) } : {};
+      patchActive({ messages: nextMsgs, ...titlePatch });
+      setBusy(true);
+
+      // Streaming-state placeholder for the assistant message-in-progress
+      let buffer = '';
+      let hits = [];
+      let rewritten = '';
+      let refused = false;
+      setStreamPartial({ role:'assistant', content:'', hits:[], rewritten:'', original_q:q });
+
+      streamCtrlRef.current = api.chatStream(doc.id, { question:q, history, top_k:8 }, {
+        onMeta: (m) => {
+          hits = m.hits || [];
+          rewritten = m.rewritten || '';
+          refused = !!m.refused;
+          setStreamPartial(prev => prev && ({ ...prev, hits, rewritten }));
+        },
+        onToken: (t) => {
+          buffer += t.t || '';
+          setStreamPartial(prev => prev && ({ ...prev, content: buffer }));
+        },
+        onDone: (d) => {
+          patchActive({
+            messages: [...nextMsgs, {
+              role:'assistant', content: buffer, hits, rewritten,
+              original_q: q, usage: d.usage || {}, refused,
+            }],
+          });
+          setStreamPartial(null);
+          setBusy(false);
+          streamCtrlRef.current = null;
+        },
+        onError: (e) => {
+          setErr(e.message || String(e));
+          setStreamPartial(null);
+          setBusy(false);
+          streamCtrlRef.current = null;
+        },
+      });
+    };
+
+    const stop = () => {
+      streamCtrlRef.current?.abort();
+      streamCtrlRef.current = null;
+      // Keep whatever was streamed so far as the final message
+      if (streamPartial && streamPartial.content) {
+        patchActive({ messages: [...messages, { ...streamPartial, content: streamPartial.content + '  …(stopped)' }] });
+      }
+      setStreamPartial(null);
+      setBusy(false);
+    };
+
+    const retry = () => {
+      if (!lastQuestion) return;
+      // Drop the trailing user message we appended optimistically, then re-send
+      patchActive({ messages: messages.slice(0, -1) });
+      send(lastQuestion);
+    };
+
+    const sendFeedback = async (msgIndex, rating) => {
+      const m = messages[msgIndex];
+      if (!m || m.role !== 'assistant') return;
+      const userMsg = messages[msgIndex - 1];
+      const citations = (m.hits || []).map(h => h.citation);
+      await api.feedback({
+        doc_id: doc.id,
+        question: userMsg?.content || '',
+        answer: m.content,
+        rating,
+        citations,
+      });
+      // Mark feedback locally (idempotent — server log keeps the record either way)
+      const next = messages.map((mm, i) => i === msgIndex ? { ...mm, feedback: rating } : mm);
+      patchActive({ messages: next });
+    };
+
+    // ---- conversation operations (used by ConvSwitcher) ----
+    const newChat = () => {
+      if (!doc) return;
+      // If the active conv is already empty, just stay in it
+      if (active && active.messages.length === 0) {
+        toast({ kind: 'info', title: 'You\'re already in a fresh chat' });
+        return;
+      }
+      const c = ConvStore.create(doc.id, { title: 'New chat' });
+      setConversations(ConvStore.list(doc.id));
+      setActiveConvId(c.id);
+      setErr(null); setLastQuestion(null);
+    };
+
+    const switchTo = (convId) => {
+      setActiveConvId(convId);
+      setErr(null); setLastQuestion(null);
+    };
+
+    const renameConv = (convId, title) => {
+      ConvStore.update(doc.id, convId, { title });
+      setConversations(ConvStore.list(doc.id));
+    };
+
+    const deleteConv = (convId) => {
+      ConvStore.remove(doc.id, convId);
+      const list = ConvStore.list(doc.id);
+      setConversations(list);
+      if (convId === activeConvId) {
+        // If we deleted the active one, fall back to the most recent or create a new empty
+        if (list.length > 0) setActiveConvId(list[0].id);
+        else { const c = ConvStore.create(doc.id, { title: 'New chat' }); setConversations([c]); setActiveConvId(c.id); }
+      }
+      toast({ kind: 'info', title: 'Chat deleted' });
+    };
+
+    const clearActive = () => {
+      if (!active || messages.length === 0) return;
+      if (!confirm('Clear all messages in this chat?')) return;
+      patchActive({ messages: [], title: 'New chat' });
+      setErr(null); setLastQuestion(null);
+      toast({ kind: 'info', title: 'Chat cleared' });
+    };
+
+    if (!doc) {
+      return (
+        <div className="flex-1 grid place-items-center text-center px-8">
+          <div className="max-w-md">
+            <div className="w-14 h-14 rounded-2xl bg-accent-500/10 border border-accent-500/30 mx-auto grid place-items-center text-accent-400">
+              <I.File/>
+            </div>
+            <h2 className="mt-4 text-xl font-semibold">Upload a PDF to get started</h2>
+            <p className="mt-2 text-sm text-ink-400">
+              Drop a report, deck, policy or contract in the sidebar. We'll build a hybrid retrieval index — every answer cites the page it came from, and the model refuses if the answer isn't there.
+            </p>
+            <div className="mt-4 flex items-center gap-2 justify-center text-[11px] text-ink-500">
+              <I.Lock/> Files stay on your machine · index built locally
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (doc.status !== 'ready') {
+      return (
+        <div className="flex-1 grid place-items-center text-center px-8">
+          <div className="max-w-md">
+            {doc.status === 'error' ? (
+              <>
+                <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 mx-auto grid place-items-center text-rose-400"><I.Warn/></div>
+                <h2 className="mt-4 text-xl font-semibold">Indexing failed</h2>
+                <p className="mt-2 text-sm text-rose-300 break-words">{doc.error}</p>
+              </>
+            ) : (
+              <>
+                <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/30 mx-auto grid place-items-center text-sky-400 animate-pulse-soft">
+                  <I.Loader/>
+                </div>
+                <h2 className="mt-4 text-xl font-semibold">{doc.status === 'indexing' ? 'Indexing…' : 'Queued…'}</h2>
+                <p className="mt-2 text-sm text-ink-400">
+                  Extracting pages, captioning images with the vision model, then embedding via <span className="font-mono text-ink-200">{info?.embed_model || 'embed model'}</span>.
+                </p>
+                {doc.stage && (
+                  <div className="mt-3 inline-block px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 text-[12px] animate-pulse-soft">
+                    {doc.stage}
+                  </div>
+                )}
+                {doc.pages > 0 && <p className="mt-2 text-xs text-ink-400">{doc.pages} pages, {doc.chunks} chunks</p>}
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-ink-700 bg-ink-900">
+          <div className="min-w-0 flex items-center gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{doc.name}</div>
+              <div className="text-[11px] text-ink-400">
+                {doc.pages} pages · {doc.chunks} chunks · {doc.table_chunks} tables · indexed with{' '}
+                <span className="font-mono">{doc.backend}/{doc.model.split('/').pop()}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <ConvSwitcher
+              active={active}
+              conversations={conversations}
+              onSwitch={switchTo}
+              onNew={newChat}
+              onRename={renameConv}
+              onDelete={deleteConv}/>
+            <button onClick={newChat} data-tip="Start a new chat (keeps history)"
+              className="text-[12px] text-ink-300 hover:text-accent-300 px-2 py-1 rounded border border-ink-600 hover:border-accent-500/50 inline-flex items-center gap-1">
+              <I.Plus/> New
+            </button>
+            <a href={api.pdfUrl(doc.id)} target="_blank" rel="noreferrer"
+              data-tip="Open the source PDF in a new tab"
+              className="text-[12px] text-ink-300 hover:text-ink-100 px-2 py-1 rounded border border-ink-600 hover:border-ink-500">
+              Open PDF ↗
+            </a>
+            <button onClick={clearActive} data-tip="Clear messages in this chat"
+              className="text-[12px] text-ink-300 hover:text-rose-300 px-2 py-1 rounded border border-ink-600 hover:border-rose-500/50 inline-flex items-center gap-1">
+              <I.Reset/> Clear
+            </button>
+          </div>
+        </div>
+
+        <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-5 py-6 relative">
+          <div className="max-w-4xl mx-auto space-y-5">
+            {messages.length === 0 && !streamPartial && (
+              <div className="text-center pt-4">
+                <div className="text-sm text-ink-200">Ask anything grounded in this document.</div>
+                <div className="mt-1 text-[11px] text-ink-400">
+                  {suggestions === null ? 'Generating starter questions…' :
+                   suggestions.length === 0 ? 'Type your question, or pick from these defaults.' :
+                   'Suggested by reading your document:'}
+                </div>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(suggestions === null ? Array(4).fill(null) :
+                    suggestions.length > 0 ? suggestions : SUGGESTIONS).map((s, i) => (
+                    s === null
+                      ? <div key={i} className="h-12 skel"/>
+                      : <button key={s} onClick={()=>send(s)}
+                          className="text-left px-3 py-2.5 rounded-lg border border-ink-700 hover:border-accent-500/40 hover:bg-accent-500/5 text-[13px] text-ink-200 transition">
+                          {s}
+                        </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <Message key={i} msg={m} doc={doc} onCiteClick={onCiteClick}
+                       onFeedback={m.role==='assistant' ? (rating)=>sendFeedback(i, rating) : null}/>
+            ))}
+            {streamPartial && (
+              <Message msg={streamPartial} doc={doc} onCiteClick={onCiteClick} streaming={true}/>
+            )}
+            {busy && !streamPartial && <ChatSkeleton/>}
+          </div>
+
+          {showJump && (
+            <button
+              onClick={()=>scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior:'smooth' })}
+              aria-label="Scroll to bottom"
+              className="sticky bottom-3 ml-auto mr-3 block px-3 py-1.5 rounded-full bg-ink-850 border border-ink-600 text-[12px] text-ink-200 shadow-lg hover:bg-ink-800">
+              <I.Down className="inline mr-1"/> Jump to latest
+            </button>
+          )}
+        </div>
+
+        <Composer onSend={send} disabled={busy}
+                  error={err}
+                  onStop={busy ? stop : null}
+                  onRetry={lastQuestion ? retry : null}/>
+      </div>
+    );
+  };
+
+  // ---------- Citation drawer ----------
+  const CiteDrawer = ({ doc, cite, hits, onClose }) => {
+    // ESC to close (HCI: user control)
+    useEffect(() => {
+      if (!cite) return;
+      const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [cite]);
+
+    if (!cite) return null;
+    const hit = (hits || []).find(h => h.citation === cite);
+    const page = hit?.page || (cite.match(/p(\d+)/)?.[1]);
+    const pdfUrl = doc ? `${api.pdfUrl(doc.id)}#page=${page}` : null;
+
+    return (
+      <div className="fixed inset-0 z-40 flex" onClick={onClose} role="dialog" aria-modal="true" aria-label="Citation evidence">
+        <div className="flex-1 bg-black/40"/>
+        <div className="w-[520px] max-w-[90%] h-full bg-ink-900 border-l border-ink-700 flex flex-col animate-slide-in" onClick={e=>e.stopPropagation()}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-ink-700">
+            <div className="flex items-center gap-2">
+              <span className="cite-chip">{cite}</span>
+              {hit && <span className="text-[11px] text-ink-400">{hit.kind}</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {pdfUrl && (
+                <a href={pdfUrl} target="_blank" rel="noreferrer"
+                  className="text-[12px] px-2 py-1 rounded border border-ink-600 hover:border-ink-500 text-ink-200">
+                  Open page {page} ↗
+                </a>
+              )}
+              <button onClick={onClose} aria-label="Close drawer" data-tip="Close (Esc)" className="text-ink-400 hover:text-ink-100 px-2">✕</button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {hit ? (
+              <>
+                <div className="text-[11px] text-ink-400 font-mono mb-2 flex flex-wrap gap-x-4 gap-y-1">
+                  <span>page {hit.page}</span>
+                  <span>chunk {hit.chunk_id}</span>
+                  <span className="px-1 rounded border border-ink-700 uppercase tracking-wider">{hit.kind}</span>
+                  <span data-tip="dense cosine">d={hit.dense_score.toFixed(3)}</span>
+                  <span data-tip="bm25">bm25={hit.sparse_score.toFixed(2)}</span>
+                  <span data-tip="reciprocal rank fusion">rrf={hit.score.toFixed(4)}</span>
+                  {typeof hit.rerank_score === 'number' && hit.rerank_score !== 0 && (
+                    <span data-tip="cross-encoder rerank">rerank={hit.rerank_score.toFixed(2)}</span>
+                  )}
+                </div>
+                {hit.kind === 'image' && hit.image_file && doc && (
+                  <div className="mb-3">
+                    <div className="text-[10px] uppercase tracking-wider text-ink-400 mb-1">Source image</div>
+                    <a href={api.imageUrl(doc.id, hit.image_file)} target="_blank" rel="noreferrer">
+                      <img src={api.imageUrl(doc.id, hit.image_file)} alt="cited image"
+                           className="max-w-full max-h-[60vh] rounded border border-ink-700 bg-ink-950"/>
+                    </a>
+                    <div className="text-[10px] uppercase tracking-wider text-ink-400 mt-3 mb-1">AI description (indexed)</div>
+                  </div>
+                )}
+                <pre className="text-[12.5px] text-ink-100 whitespace-pre-wrap font-mono leading-relaxed">
+{hit.text}
+                </pre>
+              </>
+            ) : (
+              <div className="text-sm text-ink-400">No retrieved chunk recorded for {cite}.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ---------- App root ----------
+  function App() {
+    const [info, setInfo] = useState(null);
+    const [docs, setDocs] = useState([]);
+    const [activeId, setActiveId] = useState(null);
+    const [drawer, setDrawer] = useState({ cite: null, hits: [] });
+    const [authNeeded, setAuthNeeded] = useState(false);
+    // Bumped after every chat turn so the RecentChats panel re-reads localStorage.
+    const [recentRefreshKey, setRecentRefreshKey] = useState(0);
+    // Resume directive — { docId, convId } — picked up by ChatPane when active doc changes.
+    const [resumeReq, setResumeReq] = useState(null);
+    const toast = useToast();
+
+    const loadInfo = async () => {
+      try { setInfo(await api.info()); }
+      catch (e) {
+        if (e.status === 401) { setAuthNeeded(true); }
+        else { toast({ kind:'error', title:'Backend unreachable', body: e.message }); }
+      }
+    };
+    const loadDocs = async () => {
+      try {
+        const next = await api.listDocs();
+        setDocs(next);
+        setActiveId(prev => prev || (next[0]?.id ?? null));
+      } catch (e) {
+        if (e.status === 401) { setAuthNeeded(true); }
+      }
+    };
+
+    useEffect(() => { loadInfo(); loadDocs(); }, []);
+
+    // Poll for in-progress docs
+    useEffect(() => {
+      const inflight = docs.some(d => d.status === 'pending' || d.status === 'indexing');
+      if (!inflight) return;
+      const t = setInterval(loadDocs, 1500);
+      return () => clearInterval(t);
+    }, [docs]);
+
+    // Global keyboard shortcuts (HCI: efficiency for power users)
+    useEffect(() => {
+      const onKey = (e) => {
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+        if (e.key === '/') {
+          e.preventDefault();
+          document.querySelector('textarea[aria-label="Question"]')?.focus();
+        }
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
+    const onUpload = async (file) => {
+      const id = toast({ kind:'info', title: `Uploading ${file.name}…`, timeout: 0 });
+      try {
+        const d = await api.upload(file);
+        setDocs(prev => [d, ...prev.filter(x => x.id !== d.id)]);
+        setActiveId(d.id);
+        toast({ kind:'success', title:'Upload complete', body:'Indexing started — this usually takes seconds.' });
+      } catch (e) {
+        toast({ kind:'error', title:'Upload failed', body: e.message });
+      }
+    };
+
+    const onDelete = async (id) => {
+      try {
+        await api.deleteDoc(id);
+        // Clean up all conversation-related keys for this doc
+        localStorage.removeItem(`chat:${id}`);
+        localStorage.removeItem(`convs:${id}`);
+        localStorage.removeItem(`active_conv:${id}`);
+        setDocs(prev => prev.filter(d => d.id !== id));
+        if (activeId === id) setActiveId(null);
+        setRecentRefreshKey(k => k + 1);
+        toast({ kind:'info', title:'Document deleted' });
+      } catch (e) {
+        toast({ kind:'error', title:'Delete failed', body: e.message });
+      }
+    };
+
+    /** Resume any past conversation in one click. If the doc isn't currently
+     *  active, switch to it; ChatPane picks up resumeReq on mount/doc-change. */
+    const onResume = (docId, convId) => {
+      ConvStore.setActive(docId, convId);   // tell storage which conv to open
+      setResumeReq({ docId, convId, t: Date.now() });
+      setActiveId(docId);
+      toast({ kind: 'info', title: 'Resumed previous chat' });
+    };
+
+    if (authNeeded) {
+      return <AuthGate onSubmit={(t)=>{ localStorage.setItem('rag_token', t); setAuthNeeded(false); loadInfo(); loadDocs(); }}/>;
+    }
+
+    const activeDoc = docs.find(d => d.id === activeId) || null;
+
+    return (
+      <div className="h-full flex">
+        <Sidebar docs={docs} activeId={activeId} onSelect={setActiveId}
+                 onUpload={onUpload} onDelete={onDelete} onResume={onResume}
+                 info={info} recentRefreshKey={recentRefreshKey}/>
+        <main className="flex-1 flex flex-col min-w-0">
+          <ChatPane doc={activeDoc} info={info}
+                    resumeReq={resumeReq}
+                    onTurnSaved={() => setRecentRefreshKey(k => k + 1)}
+                    onCiteClick={(cite, hits) => setDrawer({ cite, hits })}/>
+        </main>
+        <CiteDrawer doc={activeDoc} cite={drawer.cite} hits={drawer.hits}
+                    onClose={() => setDrawer({ cite:null, hits:[] })}/>
+      </div>
+    );
+  }
+
+  // ---------- Auth gate (only shown if backend requires bearer token) ----------
+  const AuthGate = ({ onSubmit }) => {
+    const [t, setT] = useState('');
+    return (
+      <div className="h-full grid place-items-center px-6">
+        <form onSubmit={e=>{e.preventDefault(); if (t.trim()) onSubmit(t.trim());}}
+              className="w-full max-w-sm space-y-3 p-6 rounded-xl border border-ink-700 bg-ink-900">
+          <div className="flex items-center gap-2">
+            <I.Lock className="text-accent-400"/>
+            <h2 className="text-base font-semibold">API token required</h2>
+          </div>
+          <p className="text-[12px] text-ink-300">This server is configured with <code className="font-mono">RAG_AUTH_TOKEN</code>. Paste your token to continue.</p>
+          <input value={t} onChange={e=>setT(e.target.value)}
+                 type="password" autoFocus
+                 placeholder="Bearer token"
+                 className="w-full bg-ink-850 border border-ink-600 rounded px-3 py-2 text-sm focus:border-accent-500/50 outline-none"/>
+          <button type="submit" disabled={!t.trim()}
+            className="w-full rounded-lg py-2 bg-accent-600 hover:bg-accent-500 disabled:bg-ink-700 disabled:text-ink-400 text-ink-950 font-medium">
+            Unlock
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <ToastProvider><App/></ToastProvider>
+  );
+  </script>
+</body>
+</html>
